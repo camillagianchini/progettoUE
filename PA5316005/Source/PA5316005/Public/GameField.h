@@ -22,7 +22,7 @@ public:
 	TArray<ATile*> TileArray;
 
 	UPROPERTY(Transient)
-	TMap<FVector, ATile*> TileMap;
+	TMap<FVector2D, ATile*> TileMap;
 
 	float NormalizedCellPaggind;
 
@@ -34,26 +34,35 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     int32 Size;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    int32 WinSize;
-
 	UPROPERTY(EditDefaultsOnly)
 	TSubclassOf<ATile> TileClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float CellPadding;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float TileSize;
 
+	virtual void OnConstruction(const FTransform& Transform) override;
 
+	UFUNCTION(BlueprintCallable)
+	void ResetField();
+
+	void GenerateField();
+
+	FVector2D GetPosition(const FHitResult& Hit);
+
+	TArray<ATile*>& GetTileArray();
+
+	FVector GetRelativeLocationByXYPosition(const int32 InX, const int32 InY) const;
+
+	inline bool IsValidPosition(const FVector2D Position) const;
+
+	TArray<int32> GetLine(const FVector2D Begin, const FVector2D End) const;
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-public:	
+//public:	
 	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	//virtual void Tick(float DeltaTime) override;
 
 };
