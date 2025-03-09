@@ -57,6 +57,11 @@ public:
 
 	TArray<int32> GetLine(const FVector2D Begin, const FVector2D End) const;
 
+	UFUNCTION(BlueprintCallable, Category = "GameField")
+	ATile* GetTileAt(const FVector2D& Position);
+
+
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

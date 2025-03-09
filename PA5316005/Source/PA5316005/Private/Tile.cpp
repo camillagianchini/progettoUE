@@ -53,6 +53,35 @@ void ATile::BeginPlay()
 
 }
 
+#include "Tile.h"
+#include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+
+void ATile::HighlightTile(const FColor& InColor)
+{
+	// Creiamo un Dynamic Material Instance (DMI) se non esiste
+	// In un gioco di esempio, potresti farlo in BeginPlay() una volta sola
+	UMaterialInstanceDynamic* DynMat = StaticMeshComponent->CreateAndSetMaterialInstanceDynamic(0);
+	if (DynMat)
+	{
+		// Se nel tuo materiale hai un parametro tipo "BaseColor", puoi settarlo:
+		// Nota: dipende da come è fatto il tuo materiale
+		DynMat->SetVectorParameterValue(FName("BaseColor"), FVector(InColor.R, InColor.G, InColor.B));
+	}
+}
+
+void ATile::ResetHighlight()
+{
+	// Torna al materiale di default, oppure usa un colore neutro.
+	// Esempio: usa di nuovo un DMI con un colore "grigio"
+	UMaterialInstanceDynamic* DynMat = StaticMeshComponent->CreateAndSetMaterialInstanceDynamic(0);
+	if (DynMat)
+	{
+		DynMat->SetVectorParameterValue(FName("BaseColor"), FVector(1.f, 1.f, 1.f));
+	}
+}
+
+
 // Called every frame
 //void ATile::Tick(float DeltaTime)
 //{

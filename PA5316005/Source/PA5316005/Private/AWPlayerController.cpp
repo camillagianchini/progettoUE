@@ -1,28 +1,43 @@
 #include "AWPlayerController.h"
-#include "Tile.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "Kismet/GameplayStatics.h"
 #include "GameField.h"
+#include "Tile.h"
 #include "Sniper.h"
 #include "Brawler.h"
-#include "GameFramework/InputSettings.h"
-#include "Kismet/GameplayStatics.h"
 
 AAWPlayerController::AAWPlayerController()
 {
-    bShowMouseCursor = true;  // Mostra il cursore del mouse
+    bShowMouseCursor = true;
 }
 
 void AAWPlayerController::BeginPlay()
 {
     Super::BeginPlay();
+
+    // Assicura che la mapping context sia aggiunta
+    if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+        ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+    {
+        Subsystem->AddMappingContext(AWMappingContext, 0);
+    }
 }
 
 void AAWPlayerController::SetupInputComponent()
 {
-    Super::SetupInputComponent();  // Ora correttamente chiamato dalla classe APlayerController
+    Super::SetupInputComponent();
 
-    InputComponent->BindAction("LeftClick", IE_Pressed, this, &AAWPlayerController::HandleClick);
+    if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent))
+    {
+        EnhancedInput->BindAction(ClickAction, ETriggerEvent::Started, this, &AAWPlayerController::OnClick);
+    }
 }
 
+void AAWPlayerController::OnClick(const FInputActionValue& Value)
+{
+    HandleClick();
+}
 
 void AAWPlayerController::HandleClick()
 {
@@ -33,21 +48,19 @@ void AAWPlayerController::HandleClick()
     {
         AActor* ClickedActor = Hit.GetActor();
 
-        // Se clicchiamo su un'unità, la selezioniamo
+        // Se clicchiamo su una nostra unità
         if (ClickedActor->ActorHasTag("HumanUnit"))
         {
             SelectUnit(ClickedActor);
         }
-        // Se clicchiamo su una cella, proviamo a muovere o attaccare
-        else if (ATile* Tile = Cast<ATile>(ClickedActor))
+        // Se clicchiamo su una Tile e abbiamo un'unità selezionata
+        else if (ATile* Tile = Cast<ATile>(ClickedActor); Tile && SelectedUnit)
         {
-            if (SelectedUnit)
-            {
-                MoveSelectedUnit(FVector2D(Tile->GetActorLocation().X, Tile->GetActorLocation().Y));
-            }
+            MoveSelectedUnit(FVector2D(Tile->GetActorLocation().X, Tile->GetActorLocation().Y));
         }
-        // Se clicchiamo su un nemico, attacchiamo
-        else if (ClickedActor->ActorHasTag("AIUnit"))
+
+        // Se clicchiamo su un nemico e abbiamo un'unità selezionata
+        else if (ClickedActor->ActorHasTag("AIUnit") && SelectedUnit)
         {
             AttackWithSelectedUnit(ClickedActor);
         }
@@ -56,18 +69,25 @@ void AAWPlayerController::HandleClick()
 
 void AAWPlayerController::SelectUnit(AActor* NewSelectedUnit)
 {
-    SelectedUnit = NewSelectedUnit;
-    GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Green, TEXT("Unità selezionata"));
+    if (!NewSelectedUnit) return;
+
+    // Seleziona solo se è una nuova unità
+    if (SelectedUnit != NewSelectedUnit)
+    {
+        SelectedUnit = NewSelectedUnit;
+        bHasMoved = false;
+        bHasAttacked = false;
+        GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Green, TEXT("Unità selezionata"));
+    }
 }
 
 void AAWPlayerController::MoveSelectedUnit(FVector2D TargetPosition)
 {
-    if (!SelectedUnit) return;
+    if (!SelectedUnit || bHasMoved) return;
 
     FVector2D StartPos = FVector2D(SelectedUnit->GetActorLocation().X, SelectedUnit->GetActorLocation().Y);
-
-    // Determina il range massimo di movimento in base all'unità selezionata
     int32 MovementRange = 0;
+
     if (ASniper* Sniper = Cast<ASniper>(SelectedUnit))
     {
         MovementRange = Sniper->MovementRange;
@@ -77,29 +97,21 @@ void AAWPlayerController::MoveSelectedUnit(FVector2D TargetPosition)
         MovementRange = Brawler->MovementRange;
     }
 
-    // Controlla se la cella è nel range di movimento
     if (!IsMoveValid(StartPos, TargetPosition, MovementRange))
     {
         GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("Movimento fuori range!"));
         return;
     }
 
-    // Se il movimento è valido, aggiorna la posizione
     FVector NewLocation = FVector(TargetPosition.X, TargetPosition.Y, SelectedUnit->GetActorLocation().Z);
     SelectedUnit->SetActorLocation(NewLocation);
+    bHasMoved = true;
     GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Green, TEXT("Unità spostata"));
 }
 
-bool AAWPlayerController::IsMoveValid(FVector2D Start, FVector2D Target, int32 MovementRange)
-{
-    int32 Distance = FMath::Abs(Target.X - Start.X) + FMath::Abs(Target.Y - Start.Y); // Distanza Manhattan
-    return (Distance <= MovementRange);
-}
-
-
 void AAWPlayerController::AttackWithSelectedUnit(AActor* Target)
 {
-    if (!SelectedUnit || !Target) return;
+    if (!SelectedUnit || !Target || bHasAttacked) return;
 
     if (ASniper* Sniper = Cast<ASniper>(SelectedUnit))
     {
@@ -110,61 +122,171 @@ void AAWPlayerController::AttackWithSelectedUnit(AActor* Target)
         Brawler->Attack(Target);
     }
 
+    bHasAttacked = true;
     GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("Attacco eseguito"));
 }
 
-TArray<FVector2D> AAWPlayerController::FindPathAStar(FVector2D Start, FVector2D Target)
+bool AAWPlayerController::IsMoveValid(FVector2D Start, FVector2D Target, int32 MovementRange)
 {
-    TArray<FVector2D> Path;
+    int32 Distance = FMath::Abs(Target.X - Start.X) + FMath::Abs(Target.Y - Start.Y); // Distanza Manhattan
+    return (Distance <= MovementRange);
+}
 
-    // Strutture dati per A*
-    TMap<FVector2D, FVector2D> CameFrom;
-    TMap<FVector2D, float> GScore;
-    TMap<FVector2D, float> FScore;
-    TPriorityQueue<FVector2D, TArray<FVector2D>, FScoreComparator> OpenSet;
+void AAWPlayerController::ShowMovementRange()
+{
+    if (!SelectedUnit) return;
 
-    GScore.Add(Start, 0);
-    FScore.Add(Start, FVector2D::Distance(Start, Target));
-    OpenSet.Enqueue(Start);
+    int32 MovementRange = 0;
+    FVector2D UnitPos = FVector2D(SelectedUnit->GetActorLocation().X, SelectedUnit->GetActorLocation().Y);
 
-    while (!OpenSet.IsEmpty())
+    if (ASniper* Sniper = Cast<ASniper>(SelectedUnit))
     {
-        FVector2D Current;
-        OpenSet.Dequeue(Current);
+        MovementRange = Sniper->MovementRange;
+    }
+    else if (ABrawler* Brawler = Cast<ABrawler>(SelectedUnit))
+    {
+        MovementRange = Brawler->MovementRange;
+    }
 
-        if (Current == Target)
+    // Evidenzia tutte le celle raggiungibili
+    for (int X = -MovementRange; X <= MovementRange; ++X)
+    {
+        for (int Y = -MovementRange; Y <= MovementRange; ++Y)
         {
-            while (CameFrom.Contains(Current))
+            FVector2D TargetPos = UnitPos + FVector2D(X, Y);
+            if (IsMoveValid(UnitPos, TargetPos, MovementRange))
             {
-                Path.Insert(Current, 0);
-                Current = CameFrom[Current];
-            }
-            Path.Insert(Start, 0);
-            return Path;
-        }
-
-        TArray<FVector2D> Neighbors = {
-            FVector2D(Current.X + 1, Current.Y),
-            FVector2D(Current.X - 1, Current.Y),
-            FVector2D(Current.X, Current.Y + 1),
-            FVector2D(Current.X, Current.Y - 1)
-        };
-
-        for (FVector2D Neighbor : Neighbors)
-        {
-            if (!GameField->IsValidTile(Neighbor)) continue;
-            if (GameField->IsObstacle(Neighbor)) continue;
-
-            float TentativeGScore = GScore[Current] + 1;
-            if (!GScore.Contains(Neighbor) || TentativeGScore < GScore[Neighbor])
-            {
-                CameFrom.Add(Neighbor, Current);
-                GScore.Add(Neighbor, TentativeGScore);
-                FScore.Add(Neighbor, TentativeGScore + FVector2D::Distance(Neighbor, Target));
-                OpenSet.Enqueue(Neighbor);
+                ATile* Tile = GameField->GetTileAt(TargetPos);
+                if (Tile) Tile->HighlightTile(FColor::Blue);  // Funzione che dovrai implementare in Tile
             }
         }
     }
+}
 
-    return Path;
+void AAWPlayerController::ClearMovementRange()
+{
+    GameField->ClearAllHighlightedTiles();  // Implementa questa funzione in GameField
+}
+
+void AAWPlayerController::ShowAttackRange()
+{
+    if (!SelectedUnit) return;
+
+    int32 AttackRange = 0;
+    FVector2D UnitPos = FVector2D(SelectedUnit->GetActorLocation().X, SelectedUnit->GetActorLocation().Y);
+
+    if (ASniper* Sniper = Cast<ASniper>(SelectedUnit))
+    {
+        AttackRange = Sniper->AttackRange;
+    }
+    else if (ABrawler* Brawler = Cast<ABrawler>(SelectedUnit))
+    {
+        AttackRange = Brawler->AttackRange;
+    }
+
+    for (int X = -AttackRange; X <= AttackRange; ++X)
+    {
+        for (int Y = -AttackRange; Y <= AttackRange; ++Y)
+        {
+            FVector2D TargetPos = UnitPos + FVector2D(X, Y);
+            if (GameField->IsValidTile(TargetPos))  // Se la cella è valida
+            {
+                ATile* Tile = GameField->GetTileAt(TargetPos);
+                if (Tile) Tile->HighlightTile(FColor::Red);
+            }
+        }
+    }
+}
+
+void AAWPlayerController::ClearAttackRange()
+{
+    GameField->ClearAllHighlightedTiles();
+}
+
+void AAWPlayerController::EndTurn()
+{
+    GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Cyan, TEXT("Turno terminato, passa all'IA"));
+
+    // Chiama il GameMode per passare il turno
+    AAWGameMode* GameMode = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+    if (GameMode)
+    {
+        GameMode->StartAITurn();  // Implementa questa funzione in GameMode
+    }
+}
+
+bool AAWPlayerController::HaveAllUnitsActed()
+{
+    // Controlla se entrambe le unità hanno usato movimento e attacco
+    bool AllUnitsDone = true;
+    TArray<AActor*> PlayerUnits;
+    UGameplayStatics::GetAllActorsWithTag(GetWorld(), "HumanUnit", PlayerUnits);
+
+    for (AActor* Unit : PlayerUnits)
+    {
+        ASniper* Sniper = Cast<ASniper>(Unit);
+        ABrawler* Brawler = Cast<ABrawler>(Unit);
+
+        if ((Sniper && (!Sniper->HasMoved || !Sniper->HasAttacked)) ||
+            (Brawler && (!Brawler->HasMoved || !Brawler->HasAttacked)))
+        {
+            AllUnitsDone = false;
+        }
+    }
+
+    return AllUnitsDone;
+}
+
+// Dopo ogni mossa o attacco, controlliamo se il turno è finito
+void AAWPlayerController::MoveSelectedUnit(FVector2D TargetPosition)
+{
+    if (!SelectedUnit || bHasMoved) return;
+
+    FVector2D StartPos = FVector2D(SelectedUnit->GetActorLocation().X, SelectedUnit->GetActorLocation().Y);
+    int32 MovementRange = 0;
+
+    if (ASniper* Sniper = Cast<ASniper>(SelectedUnit))
+    {
+        MovementRange = Sniper->MovementRange;
+        Sniper->HasMoved = true;  // Segna l'azione
+    }
+    else if (ABrawler* Brawler = Cast<ABrawler>(SelectedUnit))
+    {
+        MovementRange = Brawler->MovementRange;
+        Brawler->HasMoved = true;
+    }
+
+    if (!IsMoveValid(StartPos, TargetPosition, MovementRange)) return;
+
+    FVector NewLocation = FVector(TargetPosition.X, TargetPosition.Y, SelectedUnit->GetActorLocation().Z);
+    SelectedUnit->SetActorLocation(NewLocation);
+    bHasMoved = true;
+
+    if (HaveAllUnitsActed())
+    {
+        EndTurn();
+    }
+}
+
+void AAWPlayerController::AttackWithSelectedUnit(AActor* Target)
+{
+    if (!SelectedUnit || !Target || bHasAttacked) return;
+
+    if (ASniper* Sniper = Cast<ASniper>(SelectedUnit))
+    {
+        Sniper->Attack(Target);
+        Sniper->HasAttacked = true;
+    }
+    else if (ABrawler* Brawler = Cast<ABrawler>(SelectedUnit))
+    {
+        Brawler->Attack(Target);
+        Brawler->HasAttacked = true;
+    }
+
+    bHasAttacked = true;
+
+    if (HaveAllUnitsActed())
+    {
+        EndTurn();
+    }
 }

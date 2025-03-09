@@ -32,6 +32,13 @@ public:
 
 	FVector2D GetGridPosition();
 
+	UFUNCTION(BlueprintCallable, Category = "Tile")
+	void HighlightTile(const FColor& InColor);
+
+	UFUNCTION(BlueprintCallable, Category = "Tile")
+	void ResetHighlight();
+
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

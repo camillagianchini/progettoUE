@@ -77,3 +77,16 @@ TArray<int32> AGameField::GetLine(const FVector2D Begin, const FVector2D End) co
 {
 	return TArray<int32>();
 }
+
+ATile* AGameField::GetTileAt(const FVector2D& Position) /* senza const */
+{
+	if (!IsValidPosition(Position)) return nullptr;
+
+	if (ATile** FoundTile = TileMap.Find(Position))
+	{
+		return *FoundTile; // ATile*
+	}
+	return nullptr;
+}
+
+
