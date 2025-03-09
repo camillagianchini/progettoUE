@@ -1,29 +1,40 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "PlayerInterface.h"
+#include "Sniper.h"
+#include "Brawler.h"
+#include "AWGameMode.h"
+#include "Kismet/GameplayStatics.h"
 #include "RandomPlayer.generated.h"
 
 UCLASS()
-class PA5316005_API ARandomPlayer : public APawn
+class PA5316005_API ARandomPlayer : public APawn, public IPlayerInterface
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	// Sets default values for this pawn's properties
-	ARandomPlayer();
+    ARandomPlayer();
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+    virtual void BeginPlay() override;
 
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+public:
+    virtual void Tick(float DeltaTime) override;
+    virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+    // Game Mode reference
+    AAWGameMode* GameMode;
 
+    // Funzioni IA
+    virtual void OnTurn() override;
+    virtual void OnWin() override;
+    virtual void OnLose() override;
+
+    void DecideMove();          // Decide la prossima mossa
+    void SelectRandomUnit();    // Seleziona casualmente Sniper o Brawler
+    void MoveAndAttack(ASniper* Sniper);  // Logica per Sniper
+    void MoveAndAttack(ABrawler* Brawler); // Logica per Brawler
 };
+

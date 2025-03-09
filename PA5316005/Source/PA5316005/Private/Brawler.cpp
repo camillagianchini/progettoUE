@@ -66,8 +66,6 @@ void ABrawler::Attack(AActor* Target)
 
     GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Yellow, FString::Printf(TEXT("Brawler infligge %d danni!"), Damage));
 
-    // Controllo per il contrattacco
-    CounterAttack(Target);
 }
 
 // Funzione per verificare se il bersaglio è nel range d'attacco
@@ -99,20 +97,3 @@ void ABrawler::TakeDamage(int32 Amount)
     }
 }
 
-// Controllo per il contrattacco
-void ABrawler::CounterAttack(AActor* Attacker)
-{
-    // Se l'attaccante è vicino (range 1), il Brawler può contrattaccare
-    FVector AttackerLocation = Attacker->GetActorLocation();
-    FVector CurrentLocation = GetActorLocation();
-
-    int32 Distance = FMath::Abs(AttackerLocation.X - CurrentLocation.X) + FMath::Abs(AttackerLocation.Y - CurrentLocation.Y);
-
-    if (Distance == 1)
-    {
-        int32 CounterDamage = FMath::RandRange(1, 3);
-        TakeDamage(CounterDamage);
-
-        GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, FString::Printf(TEXT("Brawler riceve %d danni da contrattacco!"), CounterDamage));
-    }
-}

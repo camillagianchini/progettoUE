@@ -45,6 +45,4 @@ public:
     // Controllo se il bersaglio è nel range d'attacco
     bool IsTargetInRange(AActor* Target);
 
-    // Controllo per il contrattacco
-    void CounterAttack(AActor* Attacker);
 };
