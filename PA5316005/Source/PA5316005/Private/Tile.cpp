@@ -1,20 +1,19 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Tile.h"
 
 // Sets default values
 ATile::ATile()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
+	// Creazione dei componenti
 	Scene = CreateDefaultSubobject<USceneComponent>(TEXT("Scene"));
 	StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMeshComponent"));
 
+	// Imposto il componente di root e lo attacco alla scena
 	SetRootComponent(Scene);
 	StaticMeshComponent->SetupAttachment(Scene);
 
+	// Inizializzazione degli stati
 	Status = ETileStatus::EMPTY;
 	PlayerOwner = -1;
 	TileGridPosition = FVector2D(0, 0);
@@ -26,12 +25,12 @@ void ATile::SetTileStatus(const int32 TileOwner, const ETileStatus TileStatus)
 	Status = TileStatus;
 }
 
-ETileStatus ATile::GetTileStatus()
+ETileStatus ATile::GetTileStatus() const
 {
 	return Status;
 }
 
-int32 ATile::GetOwner()
+int32 ATile::GetOwner() const
 {
 	return PlayerOwner;
 }
@@ -41,51 +40,20 @@ void ATile::SetGridPosition(const double InX, const double InY)
 	TileGridPosition.Set(InX, InY);
 }
 
-FVector2D ATile::GetGridPosition()
+FVector2D ATile::GetGridPosition() const
 {
 	return TileGridPosition;
 }
 
-// Called when the game starts or when spawned
+bool ATile::IsWalkable() const
+{
+	// Una tile è percorribile se è EMPTY, altrimenti se è OCCUPIED o OBSTACLE non lo è.
+	return Status == ETileStatus::EMPTY;
+}
+
 void ATile::BeginPlay()
 {
 	Super::BeginPlay();
-
 }
 
-#include "Tile.h"
-#include "Components/StaticMeshComponent.h"
-#include "Materials/MaterialInstanceDynamic.h"
-
-void ATile::HighlightTile(const FColor& InColor)
-{
-	// Creiamo un Dynamic Material Instance (DMI) se non esiste
-	// In un gioco di esempio, potresti farlo in BeginPlay() una volta sola
-	UMaterialInstanceDynamic* DynMat = StaticMeshComponent->CreateAndSetMaterialInstanceDynamic(0);
-	if (DynMat)
-	{
-		// Se nel tuo materiale hai un parametro tipo "BaseColor", puoi settarlo:
-		// Nota: dipende da come è fatto il tuo materiale
-		DynMat->SetVectorParameterValue(FName("BaseColor"), FVector(InColor.R, InColor.G, InColor.B));
-	}
-}
-
-void ATile::ResetHighlight()
-{
-	// Torna al materiale di default, oppure usa un colore neutro.
-	// Esempio: usa di nuovo un DMI con un colore "grigio"
-	UMaterialInstanceDynamic* DynMat = StaticMeshComponent->CreateAndSetMaterialInstanceDynamic(0);
-	if (DynMat)
-	{
-		DynMat->SetVectorParameterValue(FName("BaseColor"), FVector(1.f, 1.f, 1.f));
-	}
-}
-
-
-// Called every frame
-//void ATile::Tick(float DeltaTime)
-//{
-	//Super::Tick(DeltaTime);
-//
-//}
 

@@ -1,119 +1,69 @@
 #include "Sniper.h"
-#include "GameFramework/Actor.h"
-#include "Engine/Engine.h"
+#include "Brawler.h"
+#include "GameUnit.h"
 #include "Math/UnrealMathUtility.h"
+
+// Se in futuro vuoi controllare se l'unità è un Brawler, includi l'header Brawler.h
+//#include "Brawler.h"
 
 ASniper::ASniper()
 {
-	PrimaryActorTick.bCanEverTick = true;
-
-	// Inizializzazione delle variabili in base alle specifiche
-	MovementRange = 3;
+	// Impostiamo le stats specifiche dello Sniper
+	MaxMovement = 3;
+	AttackType = EAttackType::Ranged;
 	AttackRange = 10;
-	MinDamage = 4;
-	MaxDamage = 8;
-	Health = 20;
+	DamageMin = 4;
+	DamageMax = 8;
+	HitPoints = 20;
 }
 
-void ASniper::BeginPlay()
+void ASniper::AttackUnit(AGameUnit* TargetUnit)
 {
-	Super::BeginPlay();
-}
-
-void ASniper::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-}
-
-// Funzione per muoversi sulla griglia
-void ASniper::MoveTo(FVector2D NewPosition)
-{
-	// Controllo se il movimento è entro il range
-	if (FMath::Abs(NewPosition.X - GetActorLocation().X) + FMath::Abs(NewPosition.Y - GetActorLocation().Y) <= MovementRange)
+	if (!TargetUnit)
 	{
-		SetActorLocation(FVector(NewPosition.X, NewPosition.Y, GetActorLocation().Z));
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Green, TEXT("Sniper si è mosso"));
-	}
-	else
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("Movimento fuori range!"));
-	}
-}
-
-// Funzione di attacco
-void ASniper::Attack(AActor* Target)
-{
-	if (!Target)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("Nessun bersaglio valido!"));
 		return;
 	}
 
-	if (!IsTargetInRange(Target))
+	// 1) Check distanza (lo Sniper ignora gli ostacoli, ma non la distanza)
+	int32 Dist = CalculateDistance(GridPosition, TargetUnit->GridPosition);
+	if (Dist > AttackRange)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("Bersaglio fuori dal range di attacco!"));
+		UE_LOG(LogTemp, Warning, TEXT("Sniper: Target is out of range! Dist=%d, AttackRange=%d"), Dist, AttackRange);
 		return;
 	}
 
-	// Calcolo danno casuale
-	int32 Damage = FMath::RandRange(MinDamage, MaxDamage);
+	// 2) Calcolo danno random
+	int32 Damage = FMath::RandRange(DamageMin, DamageMax);
+	UE_LOG(LogTemp, Log, TEXT("Sniper %s attacks %s for %d damage"),
+		*GetName(), *TargetUnit->GetName(), Damage);
 
-	// Applica danno all'unità bersaglio
-	ASniper* EnemyUnit = Cast<ASniper>(Target);
-	if (EnemyUnit)
+	TargetUnit->ReceiveDamage(Damage);
+
+	// 3) Logica di contrattacco:
+	//    - Se l'unità attaccata è uno Sniper (qualsiasi distanza)
+	//    - Oppure se è un Brawler e dist == 1
+	//
+	// Per distinguere, potresti castare a "ASniper" o "ABrawler" (se esiste).
+	// Se non hai ancora la classe Brawler, assumiamo di controllare un flag
+	// oppure usi un "typeid" o un "UClass" check. Ecco un esempio generico:
+
+	bool bIsSniper = (TargetUnit->GetClass()->IsChildOf(ASniper::StaticClass()));
+	bool bIsBrawler = (TargetUnit->GetClass()->IsChildOf(ABrawler::StaticClass())); 
+	// se avessi una classe Brawler
+
+	if (bIsSniper || bIsBrawler && (Dist == 1))
 	{
-		EnemyUnit->TakeDamage(Damage);
+		int32 CounterDamage = GetCounterAttackDamage(); // random 1..3
+		UE_LOG(LogTemp, Log, TEXT("Sniper receives a counterattack of %d damage!"), CounterDamage);
+		ReceiveDamage(CounterDamage);
 	}
-
-	GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Yellow, FString::Printf(TEXT("Sniper infligge %d danni!"), Damage));
-
-	// Controllo per il contrattacco
-	CounterAttack(Target);
 }
 
-// Funzione per verificare se il bersaglio è nel range d'attacco
-bool ASniper::IsTargetInRange(AActor* Target)
+int32 ASniper::GetCounterAttackDamage() const
 {
-	// Ottiene la distanza dalla posizione attuale
-	FVector TargetLocation = Target->GetActorLocation();
-	FVector CurrentLocation = GetActorLocation();
-
-	// Distanza in griglia Manhattan (orizzontale + verticale)
-	int32 Distance = FMath::Abs(TargetLocation.X - CurrentLocation.X) + FMath::Abs(TargetLocation.Y - CurrentLocation.Y);
-
-	return Distance <= AttackRange;
+	// Contrattacco random [1..3]
+	return FMath::RandRange(1, 3);
 }
 
-// Funzione per ricevere danno
-void ASniper::TakeDamage(int32 Amount)
-{
-	Health -= Amount;
 
-	if (Health <= 0)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("Sniper è stato eliminato!"));
-		Destroy();
-	}
-	else
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, FString::Printf(TEXT("Sniper subisce %d danni! Vita rimanente: %d"), Amount, Health));
-	}
-}
 
-// Controllo per il contrattacco
-void ASniper::CounterAttack(AActor* Attacker)
-{
-	// Se l'attaccante è vicino (range 1) oppure è uno Sniper, contrattacca
-	FVector AttackerLocation = Attacker->GetActorLocation();
-	FVector CurrentLocation = GetActorLocation();
-
-	int32 Distance = FMath::Abs(AttackerLocation.X - CurrentLocation.X) + FMath::Abs(AttackerLocation.Y - CurrentLocation.Y);
-
-	if (Distance == 1 || Cast<ASniper>(Attacker))
-	{
-		int32 CounterDamage = FMath::RandRange(1, 3);
-		TakeDamage(CounterDamage);
-
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, FString::Printf(TEXT("Sniper riceve %d danni da contrattacco!"), CounterDamage));
-	}
-}
