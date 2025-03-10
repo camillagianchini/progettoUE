@@ -5,6 +5,7 @@
 AGameField::AGameField()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	CurrentlySelectedTile = FVector2D(-1, -1);
 
 	// Valori di default
 	GridSize = 25;
@@ -22,6 +23,31 @@ void AGameField::OnConstruction(const FTransform& Transform)
 
 	// Calcolo del fattore di “spaziatura” orizzontale/verticale tra le celle
 	NextCellPositionMultiplier = (TileSize + TileSize * CellPadding) / TileSize;
+}
+
+void AGameField::SetSelectedTile(const FVector2D& Position)
+{
+	// Se esiste una tile selezionata precedentemente, potresti deselezionarla
+	if (TileMap.Contains(CurrentlySelectedTile))
+	{
+		ATile* OldTile = TileMap[CurrentlySelectedTile];
+		// Esempio: reimposta il materiale o il colore di default
+		// OldTile->SetTileHighlight(false);
+	}
+
+	// Se la tile esiste nel TileMap, la evidenzi
+	if (TileMap.Contains(Position))
+	{
+		ATile* NewTile = TileMap[Position];
+		// Esempio: cambia colore, materiale, o attiva un highlight
+		// NewTile->SetTileHighlight(true);
+
+		CurrentlySelectedTile = Position; // Memorizza la tile come "selezionata"
+	}
+	else
+	{
+		CurrentlySelectedTile = FVector2D(-1, -1);
+	}
 }
 
 void AGameField::BeginPlay()

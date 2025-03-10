@@ -98,6 +98,9 @@ public:
 	// Verifica se (x, y) è una posizione valida nella griglia
 	bool IsValidCoordinate(const FVector2D& Coord) const;
 
+	UFUNCTION(BlueprintCallable, Category = "Selection")
+	void SetSelectedTile(const FVector2D& Position);
+
 protected:
 
 	// Esegue un controllo BFS/DFS per verificare se tutte le celle libere sono connesse
@@ -105,4 +108,6 @@ protected:
 
 	// Ritorna le celle adiacenti (su/giù/destra/sinistra) valide e libere
 	TArray<FVector2D> GetNeighbors(const FVector2D& CurrentCoord) const;
+
+	FVector2D CurrentlySelectedTile;
 };

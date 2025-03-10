@@ -48,6 +48,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit Stats")
 	int32 HitPoints;
 
+	// **Aggiungi questa variabile per risolvere l'errore**:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit Stats")
+	int32 UnitOwner;  // 1 = Human, 2 = AI, ecc.
+
 	//------------------------------------------------
 	// Riferimenti / Info di posizionamento
 	//------------------------------------------------
