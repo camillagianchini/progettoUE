@@ -15,7 +15,7 @@ void AAWPlayerController::BeginPlay()
 	// Se utilizzi Enhanced Input, aggiungi il mapping context
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
-		Subsystem->AddMappingContext(InputMappingContext, 0);
+		Subsystem->AddMappingContext(AWContext, 0);
 	}
 }
 

@@ -1,5 +1,9 @@
 #pragma once
 
+#include "AWGameMode.h"
+#include "AWGameInstance.h"
+#include "PlayerInterface.h"
+
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
 #include "PlayerInterface.h"
@@ -18,16 +22,27 @@ public:
 protected:
 	// Chiamato all’avvio del gioco o quando spawnato
 	virtual void BeginPlay() override;
+	bool IsMyTurn = false;
 
 public:
 	// Chiamato ogni frame
 	virtual void Tick(float DeltaTime) override;
 
+	// Camera component attached to player pawn
+	UCameraComponent* Camera;
+
+	// Game instance reference
+	UAWGameInstance* GameInstance;
+
+	// Game Mode reference
+	AAWGameMode* GameMode;
+
 	// IPlayerInterface
 	virtual void OnTurn() override;
 	virtual void OnWin() override;
 	virtual void OnLose() override;
-	virtual void MakeMove() override;
+
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	// Metodo chiamato dal PlayerController (AWPlayerController) quando si clicca
 	UFUNCTION()
@@ -36,39 +51,17 @@ public:
 	// Se in fase di Turn, gestisce il click su una tile
 	void HandleTileClick(class ATile* ClickedTile);
 
-	// Se in fase di Turn, gestisce il click su un’unità
-	void HandleUnitClick(class AGameUnit* ClickedUnit);
-
 	// Se in Placement, piazza un’unità su una tile
 	void HandlePlacementClick(class ATile* ClickedTile);
 
-	//-----------------------------------------
-	// Riferimenti e variabili
-	//-----------------------------------------
+	// Se in fase di Turn, gestisce il click su un’unità
+	void HandleGameUnitClick(class AGameUnit* ClickedUnit);
 
-	// Camera
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UCameraComponent* Camera;
+	// Execute the move
+	void ExecuteTheMoveForHumanPlayer(const ATile* EndTile);
 
-	// Riferimento al GameMode (AWGameMode)
-	UPROPERTY()
-	class AAWGameMode* GameModeRef;
+	void ExecuteTheAttackForHumanPlayer(const ATile* TargetTile);
 
-	// Riferimento al GameInstance (AWGameInstance)
-	UPROPERTY()
-	class UAWGameInstance* GameInstanceRef;
-
-	// Flag che indica se è il turno del giocatore umano
-	bool bIsMyTurn;
-
-	// Unità attualmente selezionata in fase di Turn
-	UPROPERTY()
-	class AGameUnit* SelectedUnit;
-
-	// (Opzionale) Decide quale unità piazzare in fase di placement: "Sniper" o "Brawler"
-	// In un progetto reale potresti farlo scegliere via UI.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Placement")
-	FName UnitToPlace;
 };
 
 

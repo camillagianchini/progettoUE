@@ -1,14 +1,48 @@
 #pragma once
 
+#include "PlayerInterface.h"
+#include "GameField.h"
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "AWGameMode.generated.h"
 
-UENUM(BlueprintType)
-enum class EGamePhase : uint8
+class AActor;
+class FPosition;
+
+USTRUCT(BlueprintType)
+struct FMove
 {
-	Placement UMETA(DisplayName = "Placement"),
-	Turn      UMETA(DisplayName = "Turn")
+	GENERATED_BODY()
+
+	// Numero della mossa nell'ordine di esecuzione
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Moves")
+	int32 MoveNumber;
+
+	// ID dell'unità che ha effettuato la mossa
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Moves")
+	int32 UnitID;
+
+	// Posizione di partenza
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Moves")
+	FVector2D Start;
+
+	// Posizione di arrivo
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Moves")
+	FVector2D End;
+
+	// ID dell'unità catturata (se presente, altrimenti -1)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Moves")
+	int32 CapturedUnitID;
+
+
+
+	FMove()
+		: MoveNumber(-1), UnitID(-1), Start(FVector2D(-1, -1)), End(FVector2D(-1, -1)), CapturedUnitID(-1)
+	{}
+
+	FMove(int32 NewMoveNumber, int32 NewUnitID, FVector2D NewStart, FVector2D NewEnd, int32 NewCapturedUnitID)
+		: MoveNumber(NewMoveNumber), UnitID(NewUnitID), Start(NewStart), End(NewEnd), CapturedUnitID(NewCapturedUnitID)
+	{}
 };
 
 UCLASS()
@@ -17,107 +51,94 @@ class PA5316005_API AAWGameMode : public AGameModeBase
 	GENERATED_BODY()
 
 public:
+	// ************ CONSTRUCTORS ************
 	AAWGameMode();
 
-	// Called at game start
+	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	//-----------------------------------------
-	// RIFERIMENTI AL CAMPO DI GIOCO
-	//-----------------------------------------
+	// ************ ATTRIBUTES ************
+	// Indica se la partita è terminata
+	// Nella sezione degli attributi della AWGameMode
+	TMap<int32, AGameUnit*> GameUnitMap;
 
-	// Classe da spawnare per il GameField (la griglia)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Grid")
-	TSubclassOf<class AGameField> GameFieldClass;
+	bool bIsGameOver;
 
-	// Istanza del GameField
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid")
-	class AGameField* GField;
+	// Array degli oggetti che implementano l'interfaccia giocatore (Human e AI)
+	
+	TArray<IPlayerInterface*> Players;
+	TMap<int32, FString> PlayerNames;
 
-	UFUNCTION(BlueprintCallable, Category = "Grid")
-	void SpawnGameField();
+	
+	int32 CurrentPlayer;
 
-	//-----------------------------------------
-	// FASE DI POSIZIONAMENTO
-	//-----------------------------------------
 
-	// Numero massimo di unità per giocatore (2 unità: una per tipo)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Placement")
-	int32 MaxUnitsPerPlayer;
+	int32 MoveCounter;
 
-	// Conteggio unità posizionate
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Placement")
-	int32 HumanUnitsPlaced;
+	
+	TArray<FMove> Moves;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Placement")
-	int32 AIUnitsPlaced;
+	// Riferimento al GameField (griglia di gioco)
+	UPROPERTY(EditDefaultsOnly, Category = "Game Field")
+	TSubclassOf<AGameField> GameFieldClass;
 
-	// Lancio della moneta: se true, Human inizia a posizionare; se false, AI inizia
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Placement")
-	bool bHumanStartsPlacement;
+	// Dimensione del campo (es. 25 per una griglia 25x25)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Game Field")
+	int32 FieldSize;
 
-	// Flag per il turno di posizionamento (true = turno Human, false = AI)
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Placement")
-	bool bIsHumanPlacementTurn;
+	// Riferimento all'istanza di GameField
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Field")
+	AGameField* GField;
 
-	// Inizia la fase di posizionamento
-	UFUNCTION(BlueprintCallable, Category = "Placement")
-	void StartUnitPlacement();
+	// Indica se lo Sniper del giocatore è stato posizionato
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit Placement")
+	TMap<int32, bool> bSniperPlaced;
 
-	// Piazza una unità su una tile specificata (UnitType: "Sniper" oppure "Brawler")
-	UFUNCTION(BlueprintCallable, Category = "Placement")
-	void PlaceUnitOnTile(const FVector2D& TilePosition, bool bIsHumanPlayer, FName UnitType);
+	// Indica se il Brawler del giocatore è stato posizionato
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit Placement")
+	TMap<int32, bool> bBrawlerPlaced;
 
-	//-----------------------------------------
-	// FASE DI TURNI DI GIOCO
-	//-----------------------------------------
+	// Reference to a Blueprint of Scroll box and Title for the replay
+	//UPROPERTY(EditDefaultsOnly)
+	//TSubclassOf<class UMovesPanel> PanelWidgetClass;
 
-	// Flag per il turno: true = Human, false = AI
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Turn")
-	bool bIsHumanTurn;
+	// Reference to the panel
+	//UPROPERTY(VisibleAnywhere)
+	//UMovesPanel* MovesPanel;
 
-	// Inizia il turno del giocatore (il parametro indica se è Human)
-	UFUNCTION(BlueprintCallable, Category = "Turn")
-	void StartTurn(bool bIsHumanTurnInput);
+	void SetSelectedTile(const FVector2D Position) const;
 
-	// Termina il turno corrente e passa il controllo all'altro giocatore
-	UFUNCTION(BlueprintCallable, Category = "Turn")
-	void EndTurn();
+	int32 GetNextPlayer(int32 Player) const;
 
-	//-----------------------------------------
-	// CONDIZIONI DI FINE PARTITA
-	//-----------------------------------------
+	// ************ METODI PRINCIPALI ************
+	// Simula il lancio della moneta per decidere chi inizia a posizionare le unità
+	void CoinTossForStartingPlayer();
+	
+	// Inizia il gioco, richiedendo ai giocatori di posizionare le unità
+	void ChoosePlayerAndStartGame();
 
-	// Array per tenere traccia di tutte le unità spawnate
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game")
-	TArray<class AGameUnit*> AllUnits;
+	// Effettua il posizionamento dell'unità di tipo UnitType per il giocatore PlayerID sulla tile TilePosition
+	void PlaceUnit(int32 PlayerID, FVector2D TilePosition, EGameUnitType UnitType);
 
-	// Registra una nuova unità
-	UFUNCTION(BlueprintCallable, Category = "Game")
-	void RegisterUnit(class AGameUnit* NewUnit);
 
-	// Controlla se la partita è finita (vittoria o sconfitta)
-	UFUNCTION(BlueprintCallable, Category = "Game")
-	void CheckGameEnd();
+	// Cambia turno, aggiornando CurrentPlayer e gestendo il flusso di gioco
+	void TurnNextPlayer();
 
-	//-----------------------------------------
-	// METODI DI UTILITÀ
-	//-----------------------------------------
+	// Esegue una mossa data la posizione di destinazione
+	// bIsGameMove indica se la mossa viene eseguita nel contesto del gioco (per aggiornare storico, catture, etc.)
+	void DoMove(const FVector2D EndPosition, bool bIsGameMove = false);
 
-	// Logga una mossa (da estendere per aggiornare lo storico, widget, ecc.)
-	UFUNCTION(BlueprintCallable, Category = "Game")
-	void LogMove(const FString& MoveEntry);
+	// Esegue un attacco sulla tile di destinazione senza muoversi
+	void DoAttack(const FVector2D TargetPosition, bool bIsGameMove = false);
 
-	// Evidenzia una tile selezionata (passa la chiamata a GameField)
-	UFUNCTION(BlueprintCallable, Category = "Selection")
-	void SetSelectedTile(const FVector2D& TilePosition);
 
-	//-----------------------------------------
-	// Stato del gioco
-	//-----------------------------------------
+	void SetTileMapStatus(const FVector2D Start, const FVector2D End) const;
 
-	// Fase attuale del gioco: Placement oppure Turn
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Phase")
-	EGamePhase CurrentPhase;
+	// Metodo per verificare la validità di una mossa (se ad esempio la tile è legale per il movimento)
+	bool IsIllegalMove() const;
+
+
+	// Eventuali metodi per verificare le condizioni di vittoria (es. tutte le unità avversarie eliminate)
+	bool CheckVictoryCondition() const;
+
 };
-

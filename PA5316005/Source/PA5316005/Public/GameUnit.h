@@ -2,15 +2,16 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Tile.h"
 #include "GameUnit.generated.h"
 
-// Tipo di attacco: Ranged (distanza) o Melee (corto raggio)
-UENUM(BlueprintType)
-enum class EAttackType : uint8
+class AAWGameMode;
+class AGameField;
+
+UENUM()
+enum class EGameUnitType : uint8
 {
-	Ranged UMETA(DisplayName = "Ranged"),
-	Melee  UMETA(DisplayName = "Melee")
+	SNIPER UMETA(DisplayName = "Sniper"),
+	BRAWLER UMETA(DisplayName = "Brawler")
 };
 
 UCLASS()
@@ -19,75 +20,141 @@ class PA5316005_API AGameUnit : public AActor
 	GENERATED_BODY()
 
 public:
+	// ************ CONSTRUCTORS ************
+	// Sets default values for this actor's properties
 	AGameUnit();
 
-	//------------------------------------------------
-	// Statistiche comuni a tutte le unità
-	//------------------------------------------------
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
 
-	// Quante celle (max) può muoversi (ortogonalmente).
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit Stats")
-	int32 MaxMovement;
-
-	// Tipo di attacco (Ranged o Melee).
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit Stats")
-	EAttackType AttackType;
-
-	// Range d'attacco (numero di celle).
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit Stats")
-	int32 AttackRange;
-
-	// Danno minimo e massimo.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit Stats")
-	int32 DamageMin;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit Stats")
-	int32 DamageMax;
-
-	// Punti vita dell'unità.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit Stats")
-	int32 HitPoints;
-
-	// **Aggiungi questa variabile per risolvere l'errore**:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit Stats")
-	int32 UnitOwner;  // 1 = Human, 2 = AI, ecc.
-
-	//------------------------------------------------
-	// Riferimenti / Info di posizionamento
-	//------------------------------------------------
-
-	// Memorizziamo la posizione di griglia (X, Y) dove si trova l'unità.
-	// In alternativa potresti memorizzare un puntatore alla Tile corrente.
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Unit Position")
-	FVector2D GridPosition;
-
-	// Puntatore al campo di gioco (per poter verificare le tile, ecc.)
-	UPROPERTY()
-	class AGameField* GameFieldRef;
-
-	//------------------------------------------------
-	// Metodi principali
-	//------------------------------------------------
-
-	// Sposta l'unità verso una destinazione di griglia (senza diagonali).
-	// Esempio di implementazione semplificata.
-	UFUNCTION(BlueprintCallable, Category = "Unit Actions")
-	virtual bool MoveUnit(const FVector2D& Destination);
-
-	// Attacca un'altra unità.
-	UFUNCTION(BlueprintCallable, Category = "Unit Actions")
-	virtual void AttackUnit(AGameUnit* TargetUnit);
-
-	// Funzione che calcola il danno e riduce i punti vita.
-	virtual void ReceiveDamage(int32 Damage);
+	// Called to bind functionality to input
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 protected:
-	// Se i punti vita vanno a 0 o meno, l'unità muore.
-	virtual void Die();
+	// Called when the game starts or when spawned
+	virtual void BeginPlay() override;
 
-	// Esempio di funzione di distanza (Manhattan).
-	// Se vuoi ignorare ostacoli per l'attacco ranged, userai questa per "range check".
-	virtual int32 CalculateDistance(const FVector2D& From, const FVector2D& To) const;
+	// ************ ATTRIBUTES ************
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	USceneComponent* Scene;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UStaticMeshComponent* StaticMeshComponent;
+
+	// To track the last used ID
+	static int32 NewGameUnitID;
+
+	// ID of the Game Unit
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 GameUnitID;
+
+	// Player Owner
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 PlayerOwner;
+
+	// Game Unit's position in the grid
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FVector2D GameUnitGridPosition;
+
+	// Type indicates (SNIPER or BRAWLER)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	EGameUnitType GameUnitType;
+
+	// Health Points of the unit
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 HitPoints;
+
+	// Movement range (number of cells the unit can move)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 MovementRange;
+
+	// Attack range of the unit
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 AttackRange;
+
+	// Minimum damage the unit can inflict
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 DamageMin;
+
+	// Maximum damage the unit can inflict
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 DamageMax;
+
+	// Reference to GameMode
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	AAWGameMode* GameMode;
+
+public:
+	// ************ SETTERS ************
+	// Set a unique GameUnit ID (e.g., auto-increment)
+	void SetGameUnitID();
+
+	// Set the Player Owner of the unit
+	void SetPlayerOwner(int32 NewPlayerOwner);
+
+	// Set the (x, y) grid position
+	void SetGridPosition(const double InX, const double InY);
+
+	// Set the type of the Game Unit (SNIPER or BRAWLER)
+	void SetGameUnitType(EGameUnitType NewType);
+
+	// Set the unit's Hit Points
+	void SetHitPoints(int32 NewHitPoints);
+
+	// Set the unit's Movement Range
+	void SetMovementRange(int32 NewRange);
+
+	// Set the unit's Attack Range
+	void SetAttackRange(int32 NewAttackRange);
+
+	// Set the unit's Damage values (min and max)
+	void SetDamage(int32 NewDamageMin, int32 NewDamageMax);
+
+
+	// ************ GETTERS ************
+	// Get the unique GameUnit ID
+	int32 GetGameUnitID() const;
+
+	// Get the Player Owner
+	int32 GetPlayerOwner() const;
+
+	// Get the grid position of the unit
+	FVector2D GetGridPosition() const;
+
+	// Get the type of the Game Unit
+	EGameUnitType GetGameUnitType() const;
+
+	// Get the unit's Hit Points
+	int32 GetHitPoints() const;
+
+	// Get the unit's Movement Range
+	int32 GetMovementRange() const;
+
+	// Get the unit's Attack Range
+	int32 GetAttackRange() const;
+
+	// Get the unit's minimum damage value
+	int32 GetDamageMin() const;
+
+	// Get the unit's maximum damage value
+	int32 GetDamageMax() const;
+
+	// ************ METHODS ************
+	// Calculate and return legal moves based on MovementRange.
+	// Only horizontal and vertical moves are considered.
+	virtual TArray<FVector2D> CalculateLegalMoves() const;
+
+	// Calcola e restituisce le mosse legali per l'attacco basate su AttackRange.
+// Solo spostamenti orizzontali e verticali sono considerati.
+	virtual TArray<FVector2D> CalculateAttackMoves() const;
+
+
+	// Apply damage to the unit; if HitPoints reach 0, the unit is considered dead.
+	virtual void TakeDamageUnit(int32 DamageAmount);
+
+	// Returns true if the unit is dead (HitPoints <= 0)
+	bool IsDead() const;
 };
+
 
 

@@ -228,6 +228,25 @@ void AGameField::ResetGameStatusField()
 	SetSelectedTile(FVector2D(-1, -1));
 }
 
+TArray<FVector2D> AGameField::PossibleMoves(FVector2D Position) const
+{
+	TArray<FVector2D> Moves;
+
+	// Cerca la tile nella mappa
+	if (TileMap.Contains(Position))
+	{
+		ATile* Tile = TileMap[Position];
+		if (Tile && Tile->GetGameUnit())
+		{
+			// Supponiamo che la GameUnit abbia un metodo CalculateLegalMoves()
+			Moves = Tile->GetGameUnit()->CalculateLegalMoves();
+		}
+	}
+
+	return Moves;
+}
+
+
 TArray<FVector2D> AGameField::LegalMoves(FVector2D Position) const
 {
 	if (!IsValidPosition(Position) || (*TileMap.Find(Position))->GetTileOwner() == NOT_ASSIGNED)
@@ -241,23 +260,13 @@ TArray<FVector2D> AGameField::LegalMoves(FVector2D Position) const
 
 	for (int32 index = PossibleMovesOfGameUnit.Num() - 1; index >= 0; --index)
 	{
-		GameMode->MakeMove(PossibleMovesOfGameUnit[index], false);
+		GameMode->DoMove(PossibleMovesOfGameUnit[index], false);
 
-		if (GameMode->IsIllegalMove())
-		{
-			PossibleMovesOfGameUnit.RemoveAt(index);
-		}
-
-		GameMode->UndoMove(false);
 	}
 
 	return PossibleMovesOfGameUnit;
 }
 
-TArray<FVector2D> AGameField::PossibleMoves(FVector2D Position) const
-{
-	return (*TileMap.Find(Position))->GetGameUnit()->GameUnitLegalMoves();
-}
 
 void AGameField::ShowLegalMovesInTheField()
 {
@@ -314,7 +323,7 @@ void AGameField::ResetField()
 		UE_LOG(LogTemp, Log, TEXT("GameField reset: tutte le tile sono state ripristinate e le unità eliminate."));
 
 		// Notifica ai blueprint (o ad altri sistemi) che il campo è stato resettato
-		OnReseTEvent.Broadcast();
+		OnResetEvent.Broadcast();
 }
 
 

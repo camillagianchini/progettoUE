@@ -1,6 +1,6 @@
 #include "AWGameInstance.h"
 
-void UAWGameInstance::SetTurnMessage(const FString& Message)
+void UAWGameInstance::SetTurnMessage(FString Message)
 {
 	CurrentTurnMessage = Message;
 	// Qui potresti anche aggiornare un widget se lo desideri.
@@ -22,7 +22,7 @@ int32 UAWGameInstance::GetScoreAiPlayer() const
 	return ScoreAiPlayer;
 }
 
-FString UAWGameInstance::GetTurnMessage() const
+FString UAWGameInstance::GetTurnMessage()
 {
 	return CurrentTurnMessage;
 }

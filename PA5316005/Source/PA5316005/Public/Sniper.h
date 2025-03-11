@@ -10,15 +10,19 @@ class PA5316005_API ASniper : public AGameUnit
 	GENERATED_BODY()
 
 public:
+	// ************ CONSTRUCTORS ************
 	ASniper();
 
-	// Override di AttackUnit per gestire il contrattacco
-	virtual void AttackUnit(AGameUnit* TargetUnit) override;
+	// ************ METHODS ************
+	// Gestisce il contrattacco: se le condizioni sono verificate, lo sniper subisce un danno da contrattacco.
+	UFUNCTION(BlueprintCallable, Category = "Game Unit|Sniper")
+	void HandleCounterAttack(AGameUnit* AttackedUnit);
 
 protected:
-	// Danno random in caso di contrattacco
-	int32 GetCounterAttackDamage() const;
+	// Called when the game starts or when spawned
+	virtual void BeginPlay() override;
 };
+
 
 
 

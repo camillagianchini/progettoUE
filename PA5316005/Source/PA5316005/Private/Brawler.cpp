@@ -1,23 +1,27 @@
 #include "Brawler.h"
+#include "AWGameMode.h"
+#include "UObject/ConstructorHelpers.h"
 
 ABrawler::ABrawler()
 {
-	// Imposta i valori specifici per il Brawler:
-	// Movimento massimo: 6 celle
-	MaxMovement = 6;
-
-	// Tipo di attacco: Melee (corto raggio)
-	AttackType = EAttackType::Melee;
-
-	// Range d'attacco: 1 (solo la cella adiacente)
-	AttackRange = 1;
-
-	// Danno: random tra 1 e 6
-	DamageMin = 1;
-	DamageMax = 6;
-
-	// Punti vita: 40
-	HitPoints = 40;
+	// Imposta i parametri predefiniti per il Brawler secondo le specifiche:
+	// Movimento: max 6 celle, Range attacco: 1, Danno: 1–6, Vita: 40
+	SetGameUnitType(EGameUnitType::BRAWLER);
+	SetMovementRange(6);
+	SetAttackRange(1);
+	SetDamage(1, 6);
+	SetHitPoints(40);
 }
+
+void ABrawler::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Assegna un ID univoco all'unità
+	SetGameUnitID();
+
+	// Eventuali altre inizializzazioni specifiche per il Brawler.
+}
+
 
 

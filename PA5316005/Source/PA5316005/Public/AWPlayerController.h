@@ -22,7 +22,7 @@ protected:
 public:
 	// Input mapping context per il gioco a turni
 	UPROPERTY(EditAnywhere, Category = Input)
-	UInputMappingContext* InputMappingContext;
+	UInputMappingContext* AWContext;
 
 	// L'azione di click (da definire nell'Enhanced Input)
 	UPROPERTY(EditAnywhere, Category = Input)
