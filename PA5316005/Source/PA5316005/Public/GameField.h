@@ -1,9 +1,13 @@
 #pragma once
 
+#include "Tile.h"
+
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Tile.h"
+#include "Blueprint/UserWidget.h"
 #include "GameField.generated.h"
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnReset);
 
 UCLASS()
 class PA5316005_API AGameField : public AActor
@@ -20,94 +24,84 @@ public:
 	// Chiamato all’avvio del gioco (dopo BeginPlay)
 	virtual void BeginPlay() override;
 
-	//-----------------------------------------
-	// CONFIGURAZIONE DELLA GRIGLIA
-	//-----------------------------------------
+	static constexpr int32 NOT_ASSIGNED = -1;
 
-	// Dimensione della griglia (Default 25)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid Settings")
-	int32 GridSize;
-
-	// Percentuale di ostacoli da generare in automatico (Default 0.1 = 10%)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid Settings", meta = (ClampMin = "0.0", ClampMax = "0.9"))
-	float ObstaclePercentage;
-
-	// Se true, forza la connettività di tutte le celle libere
-	// (se la generazione casuale crea “isole” non connesse, rigenera gli ostacoli)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid Settings")
-	bool bEnsureConnectivity;
-
-	//-----------------------------------------
-	// TILES
-	//-----------------------------------------
-
-	// Riferimento alla classe Tile da spawnare
-	UPROPERTY(EditDefaultsOnly, Category = "Grid Settings")
-	TSubclassOf<ATile> TileClass;
-
-	// Vettore di Tile
 	UPROPERTY(Transient)
 	TArray<ATile*> TileArray;
 
-	// Mappa che associa una posizione 2D alla Tile corrispondente
-	UPROPERTY(Transient)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TMap<FVector2D, ATile*> TileMap;
 
-	// Dimensione di una singola cella (in Unreal Units)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid Settings")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	TMap<int32, AGameUnit*> GameUnitMap;
+
+	UPROPERTY(EditDefaultsOnly)
+	FVector2D SelectedTile;
+
+	UPROPERTY(Transient)
+	TArray<FVector2D> LegalMovesArray;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int32 Size;
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<ATile> TileClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float TileSize;
 
-	// Percentuale di “padding” tra una cella e l’altra
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Grid Settings")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float CellPadding;
 
-	// Usato per calcolare la distanza effettiva tra due celle adiacenti
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid Settings")
-	float NextCellPositionMultiplier;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float NormalizedCellPadding;
 
-	//-----------------------------------------
-	// METODI PUBBLICI
-	//-----------------------------------------
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	float GameUnitScalePercentage;
 
-	// Genera l’intera griglia (viene chiamato in BeginPlay, ma puoi richiamarlo se vuoi rigenerare la mappa)
-	UFUNCTION(BlueprintCallable, Category = "Grid")
-	void GenerateField();
+	UPROPERTY(BlueprintAssignable)
+	FOnReset OnResetEvent;
 
-	// Distrugge tutte le tile esistenti
-	UFUNCTION(BlueprintCallable, Category = "Grid")
-	void ClearField();
+	UPROPERTY(EditAnywhere)
+	UUserWidget* ListOfMovesWidgetRef;
 
-	// Genera casualmente ostacoli nella griglia in base a ObstaclePercentage
-	UFUNCTION(BlueprintCallable, Category = "Grid")
-	void GenerateObstacles();
+	void SetSelectedTile(FVector2D Position);
 
-	// Se bEnsureConnectivity = true, controlla che tutte le celle libere siano connesse fra loro
-	// e rigenera gli ostacoli se non lo sono.
-	UFUNCTION(BlueprintCallable, Category = "Grid")
-	bool EnsureConnectivity();
+	void SetLegalMoves(const TArray<FVector2D>& NewLegalMoves);
 
-	// Ritorna la tile su cui si è cliccato, estraendo la posizione dalla HitResult
-	FVector2D GetPosition(const FHitResult& Hit) const;
+	FVector2D GetPosition(const FHitResult& Hit);
 
-	// Converte coordinate (x, y) in uno spawn location 3D
-	FVector GetRelativeLocationByXYPosition(int32 InX, int32 InY) const;
+	TArray<ATile*>& GetTileArray();
 
-	// Converte una location 3D in coordinate (x, y) (può servire per calcoli di pathfinding o debug)
+	TMap<FVector2D, ATile*> GetTileMap();
+
+	FVector2D GetSelectedTile() const;
+
+	TArray<FVector2D> GetLegalMoves();
+
+	FVector GetRelativePositionByXYPosition(const int32 InX, const int32 InY) const;
+
 	FVector2D GetXYPositionByRelativeLocation(const FVector& Location) const;
 
-	// Verifica se (x, y) è una posizione valida nella griglia
-	bool IsValidCoordinate(const FVector2D& Coord) const;
+	void GenerateField();
 
-	UFUNCTION(BlueprintCallable, Category = "Selection")
-	void SetSelectedTile(const FVector2D& Position);
+	void GenerateLettersAndNumbers(int32 X, int32 Y);
 
-protected:
+	template<typename T>
+	void GenerateGameUnit(FVector2D Position, int32 Player);
 
-	// Esegue un controllo BFS/DFS per verificare se tutte le celle libere sono connesse
-	bool IsMapFullyReachable() const;
+	inline bool IsValidPosition(const FVector2D Position) const;
 
-	// Ritorna le celle adiacenti (su/giù/destra/sinistra) valide e libere
-	TArray<FVector2D> GetNeighbors(const FVector2D& CurrentCoord) const;
+	void SelectTile(const FVector2D Position);
 
-	FVector2D CurrentlySelectedTile;
+	void ResetGameStatusField();
+
+	TArray<FVector2D> LegalMoves(FVector2D Position) const;
+
+	TArray<FVector2D> PossibleMoves(FVector2D Position) const;
+
+	void ShowLegalMovesInTheField();
+
+	UFUNCTION(BlueprintCallable)
+	void ResetField();
 };
