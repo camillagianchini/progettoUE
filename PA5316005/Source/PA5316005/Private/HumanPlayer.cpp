@@ -1,13 +1,17 @@
 #include "HumanPlayer.h"
 #include "GameField.h"
+
 #include "Components/InputComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 
 AHumanPlayer::AHumanPlayer()
+	: GameMode(nullptr)
 {
 	PrimaryActorTick.bCanEverTick = true;
+
 	AutoPossessPlayer = EAutoReceiveInput::Player0;
+
 
 	// Crea e imposta la Camera come RootComponent
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
@@ -50,6 +54,11 @@ void AHumanPlayer::OnLose()
 {
 	//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("You Lose!"));
 	GameInstance->SetTurnMessage(TEXT("Human Loses!"));
+}
+
+void AHumanPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
 }
 
 
@@ -168,38 +177,30 @@ void AHumanPlayer::HandlePlacementClick(ATile* ClickedTile)
 
 	if (GameMode)
 	{
-		// Usa PlayerNumber per identificare il giocatore corrente
 		int32 PlayerID = PlayerNumber; // Assicurati che PlayerNumber sia impostato correttamente
 
-		// Se lo Sniper non è ancora stato posizionato per questo giocatore, posizionalo
-		bool bSniperAlreadyPlaced = false;
-		if (GameMode->bSniperPlaced.Contains(PlayerID))
-		{
-			bSniperAlreadyPlaced = GameMode->bSniperPlaced[PlayerID];
-		}
-		if (!bSniperAlreadyPlaced)
+		// Se il giocatore non ha piazzato lo Sniper, allora piazzalo
+		if (!GameMode->bSniperPlaced.Contains(PlayerID) || !GameMode->bSniperPlaced[PlayerID])
 		{
 			GameMode->PlaceUnit(PlayerID, ClickedTile->GetGridPosition(), EGameUnitType::SNIPER);
+			GameMode->bSniperPlaced.Add(PlayerID, true);
 		}
-		// Altrimenti, se il Brawler non è ancora stato posizionato, posizionalo
+		// Altrimenti, se il giocatore non ha piazzato il Brawler, piazzalo
+		else if (!GameMode->bBrawlerPlaced.Contains(PlayerID) || !GameMode->bBrawlerPlaced[PlayerID])
+		{
+			GameMode->PlaceUnit(PlayerID, ClickedTile->GetGridPosition(), EGameUnitType::BRAWLER);
+			GameMode->bBrawlerPlaced.Add(PlayerID, true);
+		}
 		else
 		{
-			bool bBrawlerAlreadyPlaced = false;
-			if (GameMode->bBrawlerPlaced.Contains(PlayerID))
-			{
-				bBrawlerAlreadyPlaced = GameMode->bBrawlerPlaced[PlayerID];
-			}
-			if (!bBrawlerAlreadyPlaced)
-			{
-				GameMode->PlaceUnit(PlayerID, ClickedTile->GetGridPosition(), EGameUnitType::BRAWLER);
-			}
-			else
-			{
-				UE_LOG(LogTemp, Warning, TEXT("HumanPlayer: Tutte le unità sono già state posizionate per il giocatore %d."), PlayerID);
-			}
+			UE_LOG(LogTemp, Warning, TEXT("HumanPlayer: Tutte le unità sono già state posizionate per il giocatore %d."), PlayerID);
 		}
+
+		// Passa il turno al giocatore opposto dopo ogni piazzamento
+		GameMode->TurnNextPlayer();
 	}
 }
+
 
 void AHumanPlayer::HandleGameUnitClick(AGameUnit* ClickedUnit)
 {

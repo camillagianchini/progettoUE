@@ -1,6 +1,5 @@
 #include "Brawler.h"
-#include "AWGameMode.h"
-#include "UObject/ConstructorHelpers.h"
+
 
 ABrawler::ABrawler()
 {

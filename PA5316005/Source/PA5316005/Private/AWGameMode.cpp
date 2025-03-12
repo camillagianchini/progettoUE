@@ -1,13 +1,14 @@
 #include "AWGameMode.h"
-#include "GameField.h"
-#include "Tile.h"
 #include "Sniper.h"
 #include "Brawler.h"
-#include "HumanPlayer.h"
-//#include "RandomPlayer.h"
+#include "GameField.h"
 #include "AWPlayerController.h"
+#include "HumanPlayer.h"
+#include "CoinTossWidget.h"
+#include "RandomPlayer.h"
 //#include "MovesPanel.h"
 #include "EngineUtils.h"
+#include "Engine/Engine.h"
 
 AAWGameMode::AAWGameMode()
 {
@@ -58,8 +59,14 @@ void AAWGameMode::BeginPlay()
     bIsGameOver = false;
     MoveCounter = 0;
 
-    AHumanPlayer* HumanPlayer = Cast<AHumanPlayer>(*TActorIterator<AHumanPlayer>(GetWorld()));
+    AHumanPlayer* HumanPlayer = GetWorld()->GetFirstPlayerController()->GetPawn<AHumanPlayer>();
 
+
+    if (!IsValid(HumanPlayer))
+    {
+        UE_LOG(LogTemp, Error, TEXT("No player of type '%s' was found."), *AHumanPlayer::StaticClass()->GetName());
+        return;
+    }
     // Spawn del GameField
     if (GameFieldClass != nullptr)
     {
@@ -71,27 +78,26 @@ void AAWGameMode::BeginPlay()
         UE_LOG(LogTemp, Error, TEXT("Game Field is null"));
     }
 
-    const float CameraPosX = ((GField->TileSize * (FieldSize + ((FieldSize - 1) * GField->NormalizedCellPadding) - (FieldSize - 1))) / 2) - (GField->TileSize / 2);
-    const FVector CameraPos(CameraPosX, CameraPosX, 1500.0f);
+    // Calcola la posizione della camera
+    float CameraPosX = ((GField->TileSize * FieldSize) + ((FieldSize - 1) * GField->TileSize * GField->CellPadding)) * 0.5f;
+    float Zposition = 4000.0f; // Adatta questo valore in base alla tua scena
+    FVector CameraPos(CameraPosX, CameraPosX, Zposition);
 
-    HumanPlayer->SetActorLocationAndRotation(CameraPos, FRotationMatrix::MakeFromX(FVector(0, 0, -1)).Rotator());
+    // Imposta una rotazione che punta verso il basso
+    FRotator CameraRot(-90.0f, 0.0f, 0.0f);
+
+    HumanPlayer->SetActorLocationAndRotation(CameraPos, CameraRot);
 
     // Human player = 0
     Players.Add(HumanPlayer);
     PlayerNames.Add(0, "Player");
 
-    //ARandomPlayer* AIPlayer = Cast<ARandomPlayer>(*TActorIterator<ARandomPlayer>(GetWorld()));
-    //if (AIPlayer)
-    //{
-        //Players.Add(AIPlayer);
-        //PlayerNames.Add(1, "AI");
-    //}
-    //else
-    //{
-        //UE_LOG(LogTemp, Error, TEXT("AIPlayer non trovato nel mondo"));
-    //}
-
     UGameInstance* GameInstance = Cast<UGameInstance>(GetGameInstance());
+
+    auto* IA = GetWorld()->SpawnActor<ARandomPlayer>(FVector(), FRotator());
+    Players.Add(IA);
+    PlayerNames.Add(1, "IA");
+
 
 
     // Esegui il lancio della moneta per decidere chi inizia a posizionare le unità
@@ -106,7 +112,7 @@ void AAWGameMode::BeginPlay()
     //}
 
 
-    ChoosePlayerAndStartGame();
+    
 }
 
 void AAWGameMode::SetSelectedTile(const FVector2D Position) const
@@ -143,28 +149,54 @@ void AAWGameMode::CoinTossForStartingPlayer()
     CurrentPlayer = CoinResult;
 
     UE_LOG(LogTemp, Log, TEXT("Coin toss result: %d. Starting player is: %d"), CoinResult, CurrentPlayer);
+
+    // Se hai il widget per il coin toss, crealo e aggiungilo al viewport
+    if (CoinTossWidgetClass)
+    {
+        UCoinTossWidget* CoinTossWidget = CreateWidget<UCoinTossWidget>(GetWorld(), CoinTossWidgetClass);
+        if (CoinTossWidget)
+        {
+            FText ResultText = (CurrentPlayer == 0) ? FText::FromString("Human") : FText::FromString("AI");
+            CoinTossWidget->SetResultText(ResultText);
+            CoinTossWidget->AddToViewport();
+            UE_LOG(LogTemp, Log, TEXT("CoinTossWidget creato e aggiunto al viewport con il risultato: %s"), *ResultText.ToString());
+        }
+    }
+
+    // Log extra per il passaggio di fase
+     //UE_LOG(LogTemp, Log, TEXT("Coin toss completato, ora passo alla fase di posizionamento unità.")); 
+
+    // Ora chiama il metodo che dà il via al posizionamento
+    ChoosePlayerAndStartGame();
 }
+
 
 void AAWGameMode::ChoosePlayerAndStartGame()
 {
-    // Log di inizio fase di posizionamento
-    UE_LOG(LogTemp, Log, TEXT("Inizio fase di posizionamento unità. Il giocatore %d inizierà."), CurrentPlayer);
+    //UE_LOG(LogTemp, Log, TEXT("Il giocatore %d inizierà a piazzare le unità."));
 
-    // Qui potresti invocare un metodo dell'interfaccia del giocatore per mostrare la UI di posizionamento,
-    // oppure semplicemente loggare un messaggio di prompt.
-    if (Players.IsValidIndex(CurrentPlayer))
+    // Se tocca all'IA piazzare subito:
+    if (CurrentPlayer == 1)
     {
-        // Se hai implementato un metodo nell'interfaccia del giocatore per il posizionamento, potresti chiamarlo:
-        // Players[CurrentPlayer]->PromptUnitPlacement();
-
-        // Altrimenti, puoi loggare un messaggio o attivare un widget di posizionamento.
-        UE_LOG(LogTemp, Log, TEXT("Prompt: Giocatore %d, posiziona le tue unità (uno Sniper e uno Brawler) a turno."), CurrentPlayer);
+        if (ARandomPlayer* IAPlayer = Cast<ARandomPlayer>(Players[1]))
+        {
+            IAPlayer->PlaceUnitsRandomly();
+            // Dopo il piazzamento dell'IA, passa il turno al giocatore umano:
+            TurnNextPlayer();
+        }
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("Il giocatore corrente non è stato trovato per iniziare il posizionamento."));
+        // Tocca al giocatore umano:
+        // Puoi mostrare un messaggio o attivare un widget per informare l'utente che è il suo turno.
+        UE_LOG(LogTemp, Log, TEXT("Attendi input del giocatore umano per il posizionamento delle unità."));
+        // Qui non chiami PlaceUnit: il HumanPlayer, attraverso il suo sistema di input, gestirà i clic sulle tile
+        // e chiamerà PlaceUnit (via HandleTileClick/HandlePlacementClick) quando il giocatore clicca una tile.
     }
 }
+
+
+
 
 void AAWGameMode::PlaceUnit(int32 PlayerID, FVector2D TilePosition, EGameUnitType UnitType)
 {
@@ -241,12 +273,6 @@ void AAWGameMode::PlaceUnit(int32 PlayerID, FVector2D TilePosition, EGameUnitTyp
         bBrawlerPlaced.Contains(1) && bBrawlerPlaced[1])
     {
         bAllPlayersDone = true;
-    }
-    if (bAllPlayersDone)
-    {
-        UE_LOG(LogTemp, Log, TEXT("Tutti i giocatori hanno completato il posizionamento delle unità."));
-        // Puoi ora chiamare un metodo per passare alla fase successiva della partita, ad esempio:
-        // StartActiveGame();
     }
 }
 
@@ -375,11 +401,7 @@ void AAWGameMode::DoAttack(const FVector2D TargetPosition, bool bIsGameMove)
 
     // Recupera l'unità bersaglio
     AGameUnit* TargetUnit = TargetTile->GetGameUnit();
-    if (!TargetUnit)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("DoAttack: Errore, la tile target è occupata ma non contiene un'unità."));
-        return;
-    }
+    
 
     // Calcola il danno: un valore casuale tra DamageMin e DamageMax dell'attaccante
     int32 Damage = FMath::RandRange(Attacker->GetDamageMin(), Attacker->GetDamageMax());
@@ -428,15 +450,18 @@ void AAWGameMode::DoAttack(const FVector2D TargetPosition, bool bIsGameMove)
 void AAWGameMode::SetTileMapStatus(const FVector2D Start, const FVector2D End) const
 {
     ATile* StartTile = *GField->TileMap.Find(Start);
-    const int32	StartOwner = StartTile->GetTileOwner();
+    // Rinomina la variabile locale da StartOwner a TileOwner per evitare conflitti
+    const int32 TileOwner = StartTile->GetTileOwner();
     AGameUnit* GameUnit = StartTile->GetGameUnit();
 
     GameUnit->SetGridPosition(End.X, End.Y);
 
     StartTile->SetTileStatus(-1, ETileStatus::EMPTY, nullptr);
 
-    (*GField->TileMap.Find(End))->SetTileStatus(StartOwner, ETileStatus::OCCUPIED, GameUnit);
+    // Usa TileOwner qui
+    (*GField->TileMap.Find(End))->SetTileStatus(TileOwner, ETileStatus::OCCUPIED, GameUnit);
 }
+
 
 bool AAWGameMode::IsIllegalMove() const
 {
@@ -461,12 +486,7 @@ bool AAWGameMode::IsIllegalMove() const
     {
         Tile = GField->TileMap[SelectedTile];
     }
-    if (!Tile || !Tile->GetGameUnit())
-    {
-        UE_LOG(LogTemp, Warning, TEXT("IsIllegalMove: La tile selezionata non contiene un'unità."));
-        return true;
-    }
-
+ 
     // Calcola le mosse legali per l'unità sulla tile selezionata
     TArray<FVector2D> LegalMoves = Tile->GetGameUnit()->CalculateLegalMoves();
 
@@ -484,12 +504,12 @@ bool AAWGameMode::CheckVictoryCondition() const
     {
         if (Pair.Value) // Se l'unità è valida
         {
-            int32 Owner = Pair.Value->GetPlayerOwner();
-            if (Owner == 0)
+            int32 UnitOwner = Pair.Value->GetPlayerOwner();
+            if (UnitOwner == 0)
             {
                 CountPlayer0++;
             }
-            else if (Owner == 1)
+            else if (UnitOwner == 1)
             {
                 CountPlayer1++;
             }

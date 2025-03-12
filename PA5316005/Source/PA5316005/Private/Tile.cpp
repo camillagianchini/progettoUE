@@ -1,7 +1,6 @@
 #include "Tile.h"
 #include "Components/TextRenderComponent.h"
-#include "Components/StaticMeshComponent.h"
-#include "Materials/MaterialInstanceDynamic.h"
+
 
 // Sets default values
 ATile::ATile()

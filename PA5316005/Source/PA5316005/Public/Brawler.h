@@ -1,7 +1,8 @@
 #pragma once
 
-#include "CoreMinimal.h"
 #include "GameUnit.h"
+
+#include "CoreMinimal.h"
 #include "Brawler.generated.h"
 
 UCLASS()

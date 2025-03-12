@@ -31,10 +31,10 @@ void AGameField::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (ListOfMovesWidgetRef)
-	{
-		ListOfMovesWidgetRef->AddToViewport(0);
-	}
+	//if (ListOfMovesWidgetRef)
+	//{
+		//ListOfMovesWidgetRef->AddToViewport(0);
+	//}
 
 	if (TileArray.Num() == 0)
 	{
@@ -155,9 +155,9 @@ void AGameField::GenerateGameUnit(FVector2D Position, int32 Player)
 		return;
 	}
 
-	ATile* SelectedTile = TileMap[Position];
+	ATile* LocalSelectedTile = TileMap[Position];
 	// Controlla se la tile è vuota
-	if (!SelectedTile || SelectedTile->GetTileStatus() != ETileStatus::EMPTY)
+	if (!LocalSelectedTile || LocalSelectedTile->GetTileStatus() != ETileStatus::EMPTY)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("La tile in posizione %s non è vuota!"), *Position.ToString());
 		return;
@@ -181,13 +181,12 @@ void AGameField::GenerateGameUnit(FVector2D Position, int32 Player)
 	T* NewUnit = World->SpawnActor<T>(T::StaticClass(), SpawnLocation, FRotator::ZeroRotator, SpawnParams);
 	if (NewUnit)
 	{
-		// Imposta il proprietario dell'unità (funzione ipotetica implementata in AGameUnit)
 		NewUnit->SetPlayerOwner(Player);
 
 		// Aggiorna lo stato della tile: ora è occupata dall'unità appena spawnata
-		SelectedTile->SetTileStatus(Player, ETileStatus::OCCUPIED, NewUnit);
+		LocalSelectedTile->SetTileStatus(Player, ETileStatus::OCCUPIED, NewUnit);
 
-		// Aggiungi l'unità nella mappa delle unità (puoi generare un ID univoco o usare il numero di elementi attuali)
+		// Aggiungi l'unità nella mappa delle unità
 		int32 NewUnitKey = GameUnitMap.Num();
 		GameUnitMap.Add(NewUnitKey, NewUnit);
 
@@ -198,6 +197,11 @@ void AGameField::GenerateGameUnit(FVector2D Position, int32 Player)
 		UE_LOG(LogTemp, Error, TEXT("Spawn dell'unità di tipo %s fallito in posizione %s"), *T::StaticClass()->GetName(), *Position.ToString());
 	}
 }
+
+
+
+template void AGameField::GenerateGameUnit<ASniper>(FVector2D Position, int32 Player);
+template void AGameField::GenerateGameUnit<ABrawler>(FVector2D Position, int32 Player);
 
 
 inline bool AGameField::IsValidPosition(const FVector2D Position) const

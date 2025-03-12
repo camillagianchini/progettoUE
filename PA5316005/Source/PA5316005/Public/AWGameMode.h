@@ -3,11 +3,13 @@
 #include "PlayerInterface.h"
 #include "GameField.h"
 #include "CoreMinimal.h"
-#include "GameFramework/GameModeBase.h"
+#include "GameFramework/GameMode.h"
+#include "Blueprint/UserWidget.h"
 #include "AWGameMode.generated.h"
 
 class AActor;
-class FPosition;
+
+struct FPosition;
 
 USTRUCT(BlueprintType)
 struct FMove
@@ -97,6 +99,9 @@ public:
 	// Indica se il Brawler del giocatore è stato posizionato
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Unit Placement")
 	TMap<int32, bool> bBrawlerPlaced;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UUserWidget> CoinTossWidgetClass;
 
 	// Reference to a Blueprint of Scroll box and Title for the replay
 	//UPROPERTY(EditDefaultsOnly)

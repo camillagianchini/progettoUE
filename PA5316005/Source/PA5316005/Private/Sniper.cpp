@@ -1,7 +1,5 @@
 #include "Sniper.h"
-#include "AWGameMode.h"
-#include "GameUnit.h"
-#include "Math/UnrealMathUtility.h"
+
 
 ASniper::ASniper()
 {

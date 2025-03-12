@@ -1,10 +1,9 @@
 #pragma once
 
 #include "Tile.h"
-
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Blueprint/UserWidget.h"
+//#include "Blueprint/UserWidget.h"
 #include "GameField.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnReset);
