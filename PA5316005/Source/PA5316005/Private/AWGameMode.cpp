@@ -8,7 +8,7 @@
 #include "RandomPlayer.h"
 //#include "MovesPanel.h"
 #include "EngineUtils.h"
-#include "Engine/Engine.h"
+
 
 AAWGameMode::AAWGameMode()
 {
@@ -115,31 +115,6 @@ void AAWGameMode::BeginPlay()
     
 }
 
-void AAWGameMode::SetSelectedTile(const FVector2D Position) const
-{
-    // Reset the field colors
-    GField->ResetGameStatusField();
-
-    // Show selected Tile (blue color)
-    GField->SelectTile(Position);
-
-    // Return the moves for the piece at the given position passed as a parameter
-    GField->SetLegalMoves(GField->LegalMoves(Position));
-
-    // Show legal moves (yellow color)
-    GField->ShowLegalMovesInTheField();
-}
-
-int32 AAWGameMode::GetNextPlayer(int32 Player) const
-{
-    Player++;
-    if (!Players.IsValidIndex(Player))
-    {
-        Player = 0;
-    }
-    return Player;
-}
-
 void AAWGameMode::CoinTossForStartingPlayer()
 {
     // Genera un numero casuale 0 o 1
@@ -170,7 +145,6 @@ void AAWGameMode::CoinTossForStartingPlayer()
     ChoosePlayerAndStartGame();
 }
 
-
 void AAWGameMode::ChoosePlayerAndStartGame()
 {
     //UE_LOG(LogTemp, Log, TEXT("Il giocatore %d inizierà a piazzare le unità."));
@@ -189,12 +163,38 @@ void AAWGameMode::ChoosePlayerAndStartGame()
     {
         // Tocca al giocatore umano:
         // Puoi mostrare un messaggio o attivare un widget per informare l'utente che è il suo turno.
-        UE_LOG(LogTemp, Log, TEXT("Attendi input del giocatore umano per il posizionamento delle unità."));
+        UE_LOG(LogTemp, Error, TEXT("ATTENDI INPUT CLICK"));
         // Qui non chiami PlaceUnit: il HumanPlayer, attraverso il suo sistema di input, gestirà i clic sulle tile
         // e chiamerà PlaceUnit (via HandleTileClick/HandlePlacementClick) quando il giocatore clicca una tile.
     }
 }
 
+
+
+void AAWGameMode::SetSelectedTile(const FVector2D Position) const
+{
+    // Reset the field colors
+    GField->ResetGameStatusField();
+
+    // Show selected Tile (blue color)
+    GField->SelectTile(Position);
+
+    // Return the moves for the piece at the given position passed as a parameter
+    GField->SetLegalMoves(GField->LegalMoves(Position));
+
+    // Show legal moves (yellow color)
+    GField->ShowLegalMovesInTheField();
+}
+
+int32 AAWGameMode::GetNextPlayer(int32 Player) const
+{
+    Player++;
+    if (!Players.IsValidIndex(Player))
+    {
+        Player = 0;
+    }
+    return Player;
+}
 
 
 
