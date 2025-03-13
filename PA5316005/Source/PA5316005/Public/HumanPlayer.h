@@ -48,19 +48,8 @@ public:
 	UFUNCTION()
 	void OnClick();
 
-	// Se in fase di Turn, gestisce il click su una tile
-	void HandleTileClick(class ATile* ClickedTile);
-
-	// Se in Placement, piazza un’unità su una tile
-	void HandlePlacementClick(class ATile* ClickedTile);
-
-	// Se in fase di Turn, gestisce il click su un’unità
-	void HandleGameUnitClick(class AGameUnit* ClickedUnit);
-
-	// Execute the move
-	void ExecuteTheMoveForHumanPlayer(const ATile* EndTile);
-
-	void ExecuteTheAttackForHumanPlayer(const ATile* TargetTile);
+	UFUNCTION(BlueprintCallable)
+	FVector2D GetClickedTilePosition() const;
 
 };
 

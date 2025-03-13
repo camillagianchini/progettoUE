@@ -330,6 +330,25 @@ void AGameField::ResetField()
 		OnResetEvent.Broadcast();
 }
 
+ATile* AGameField::GetRandomFreeTile() const
+{
+	TArray<ATile*> FreeTiles;
+	for (ATile* Tile : TileArray)
+	{
+		if (Tile && Tile->GetTileStatus() == ETileStatus::EMPTY)
+		{
+			FreeTiles.Add(Tile);
+		}
+	}
+
+	if (FreeTiles.Num() > 0)
+	{
+		int32 RandomIndex = FMath::RandRange(0, FreeTiles.Num() - 1);
+		return FreeTiles[RandomIndex];
+	}
+
+	return nullptr;
+}
 
 
 

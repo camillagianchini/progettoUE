@@ -25,6 +25,10 @@ public:
 
 	static constexpr int32 NOT_ASSIGNED = -1;
 
+	// Restituisce una tile libera casuale; se non ne esistono, ritorna nullptr.
+	ATile* GetRandomFreeTile() const;
+
+
 	UPROPERTY(Transient)
 	TArray<ATile*> TileArray;
 

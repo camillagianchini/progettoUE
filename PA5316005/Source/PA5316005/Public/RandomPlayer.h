@@ -38,12 +38,10 @@ public:
 	virtual void OnWin() override;
 	virtual void OnLose() override;
 
-	void PlaceUnitsRandomly();
-
-	// Funzione per eseguire una mossa casuale (spostamento)
-	void MakeRandomMove();
-
-	// Funzione per eseguire un attacco casuale (se disponibili mosse d'attacco)
+	UFUNCTION(BlueprintCallable)
 	void MakeRandomAttack();
+
+	UFUNCTION(BlueprintCallable)
+	void MakeRandomMove();
 };
 

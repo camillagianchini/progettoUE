@@ -1,6 +1,7 @@
 #include "HumanPlayer.h"
 #include "GameField.h"
-
+#include "Sniper.h"
+#include "Brawler.h"
 #include "Components/InputComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -61,217 +62,117 @@ void AHumanPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 }
 
-
 void AHumanPlayer::OnClick()
 {
-	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (!PC)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("OnClick: PlayerController non trovato."));
-		return;
-	}
+    UE_LOG(LogTemp, Warning, TEXT("AHumanPlayer::OnClick() chiamato!"));
 
-	// Ottieni la posizione del mouse sullo schermo
-	float MouseX, MouseY;
-	if (!PC->GetMousePosition(MouseX, MouseY))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("OnClick: Impossibile ottenere la posizione del mouse."));
-		return;
-	}
+    // Ottieni il riferimento al GameMode
+    AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+    if (!GM)
+    {
+        UE_LOG(LogTemp, Error, TEXT("OnClick: GameMode non trovato"));
+        return;
+    }
 
-	// Deproietta la posizione del mouse in una linea nel mondo
-	FVector WorldLocation, WorldDirection;
-	if (!PC->DeprojectScreenPositionToWorld(MouseX, MouseY, WorldLocation, WorldDirection))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("OnClick: Deprojection fallita."));
-		return;
-	}
+    // Verifica che sia il turno dell'umano (player 0)
+    if (GM->CurrentPlayer != 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Non è il turno dell'umano."));
+        return;
+    }
 
-	// Imposta l'inizio e la fine del trace (una lunghezza sufficiente, es. 10000 unità)
-	FVector TraceStart = WorldLocation;
-	FVector TraceEnd = WorldLocation + WorldDirection * 10000.0f;
+    // Ottieni la posizione della tile cliccata
+    FVector2D TilePosition = GetClickedTilePosition();
 
-	// Esegui il line trace
-	FHitResult HitResult;
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(this); // Ignora il pawn stesso
+    // Recupera la tile dal GameField usando la TileMap
+    ATile* ClickedTile = nullptr;
+    if (GM->GField)
+    {
+        if (GM->GField->GetTileMap().Contains(TilePosition))
+        {
+            ClickedTile = GM->GField->GetTileMap()[TilePosition];
+        }
+    }
 
-	if (GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
-	{
-		AActor* HitActor = HitResult.GetActor();
-		if (HitActor)
-		{
-			// Verifica se l'attore colpito è una Tile
-			if (ATile* HitTile = Cast<ATile>(HitActor))
-			{
-				UE_LOG(LogTemp, Log, TEXT("OnClick: Tile colpita in %s."), *HitTile->GetGridPosition().ToString());
-				HandleTileClick(HitTile);
-				return;
-			}
-			// Se non è una Tile, verifica se è un'unità di gioco
-			if (AGameUnit* HitUnit = Cast<AGameUnit>(HitActor))
-			{
-				UE_LOG(LogTemp, Log, TEXT("OnClick: GameUnit colpita (ID: %d)."), HitUnit->GetGameUnitID());
-				HandleGameUnitClick(HitUnit);
-				return;
-			}
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Log, TEXT("OnClick: Nessun attore colpito dal line trace."));
-	}
+    if (!ClickedTile)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Tile non trovata per la posizione: %s"), *TilePosition.ToString());
+        return;
+    }
+
+    // Controlla se la tile è libera
+    if (ClickedTile->GetTileStatus() != ETileStatus::EMPTY)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("La tile in %s non è libera."), *TilePosition.ToString());
+        return;
+    }
+
+    bool bPlacedUnit = false;
+    UWorld* World = GetWorld();
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.Owner = GM;
+    FVector SpawnLocation = GM->GField->GetRelativePositionByXYPosition(TilePosition.X, TilePosition.Y);
+    SpawnLocation.Z += 50.0f; // Offset per far apparire l'unità sopra la griglia
+
+    // Decidi quale unità piazzare per il giocatore umano (player 0)
+    if (!GM->bSniperPlaced.FindRef(0))
+    {
+        // Spawna lo Sniper per il giocatore umano utilizzando il blueprint HPSniperClass
+        if (GM->HPSniperClass)
+        {
+            World->SpawnActor<ASniper>(GM->HPSniperClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
+            GM->bSniperPlaced.Add(0, true);
+            UE_LOG(LogTemp, Log, TEXT("Human ha piazzato uno Sniper in %s"), *TilePosition.ToString());
+            bPlacedUnit = true;
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("HPSniperClass non assegnato!"));
+        }
+    }
+    else if (!GM->bBrawlerPlaced.FindRef(0))
+    {
+        // Spawna il Brawler per il giocatore umano utilizzando il blueprint HPBrawlerClass
+        if (GM->HPBrawlerClass)
+        {
+            World->SpawnActor<ABrawler>(GM->HPBrawlerClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
+            GM->bBrawlerPlaced.Add(0, true);
+            UE_LOG(LogTemp, Log, TEXT("Human ha piazzato un Brawler in %s"), *TilePosition.ToString());
+            bPlacedUnit = true;
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("HPBrawlerClass non assegnato!"));
+        }
+    }
+
+    // Se un'unità è stata piazzata, passa il turno o avvia la fase di battaglia
+    if (bPlacedUnit)
+    {
+        bool bHumanDone = GM->bSniperPlaced.FindRef(0) && GM->bBrawlerPlaced.FindRef(0);
+        bool bAllPlaced = bHumanDone &&
+            GM->bSniperPlaced.FindRef(1) && GM->bBrawlerPlaced.FindRef(1);
+        if (bAllPlaced)
+        {
+            GM->CurrentPhase = EGamePhase::Battle;
+            UE_LOG(LogTemp, Log, TEXT("Tutte le unità sono state posizionate. Passaggio alla fase di battaglia."));
+        }
+        else
+        {
+            // Passa il turno all'AI (player 1)
+            GM->CurrentPlayer = 1;
+            UE_LOG(LogTemp, Log, TEXT("Passaggio del turno all'AI."));
+            GM->PlaceUnitForCurrentPlayer();
+        }
+    }
 }
 
-void AHumanPlayer::HandleTileClick(ATile* ClickedTile)
+FVector2D AHumanPlayer::GetClickedTilePosition() const
 {
-	if (!ClickedTile)
-	{
-		return;
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("HumanPlayer: Tile cliccata in %s."), *ClickedTile->GetGridPosition().ToString());
-
-	// Determina se siamo nella fase di posizionamento
-	// Ad esempio, se il giocatore non ha ancora posizionato entrambe le unità (Sniper e Brawler)
-	bool bPlacementPhase = false;
-	if (GameMode)
-	{
-		// Supponiamo che PlayerNumber sia stato impostato correttamente
-		bool bSniperPlaced = false;
-		bool bBrawlerPlaced = false;
-		if (GameMode->bSniperPlaced.Contains(PlayerNumber))
-		{
-			bSniperPlaced = GameMode->bSniperPlaced[PlayerNumber];
-		}
-		if (GameMode->bBrawlerPlaced.Contains(PlayerNumber))
-		{
-			bBrawlerPlaced = GameMode->bBrawlerPlaced[PlayerNumber];
-		}
-		// Se almeno una unità non è stata posizionata, siamo nella fase di posizionamento.
-		bPlacementPhase = !(bSniperPlaced && bBrawlerPlaced);
-	}
-
-	if (bPlacementPhase)
-	{
-		// In fase di placement, gestisci il click come placement
-		HandlePlacementClick(ClickedTile);
-	}
-	else
-	{
-		// Altrimenti, in turno, seleziona la tile e mostra le possibili mosse.
-		if (GameMode)
-		{
-			GameMode->SetSelectedTile(ClickedTile->GetGridPosition());
-		}
-	}
-}
-void AHumanPlayer::HandlePlacementClick(ATile* ClickedTile)
-{
-	if (!ClickedTile)
-	{
-		return;
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("HumanPlayer: Placement click sulla tile in %s."), *ClickedTile->GetGridPosition().ToString());
-
-	if (GameMode)
-	{
-		int32 PlayerID = PlayerNumber; // Assicurati che PlayerNumber sia impostato correttamente
-
-		// Se il giocatore non ha piazzato lo Sniper, allora piazzalo
-		if (!GameMode->bSniperPlaced.Contains(PlayerID) || !GameMode->bSniperPlaced[PlayerID])
-		{
-			GameMode->PlaceUnit(PlayerID, ClickedTile->GetGridPosition(), EGameUnitType::SNIPER);
-			GameMode->bSniperPlaced.Add(PlayerID, true);
-		}
-		// Altrimenti, se il giocatore non ha piazzato il Brawler, piazzalo
-		else if (!GameMode->bBrawlerPlaced.Contains(PlayerID) || !GameMode->bBrawlerPlaced[PlayerID])
-		{
-			GameMode->PlaceUnit(PlayerID, ClickedTile->GetGridPosition(), EGameUnitType::BRAWLER);
-			GameMode->bBrawlerPlaced.Add(PlayerID, true);
-		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("HumanPlayer: Tutte le unità sono già state posizionate per il giocatore %d."), PlayerID);
-		}
-
-		// Passa il turno al giocatore opposto dopo ogni piazzamento
-		GameMode->TurnNextPlayer();
-	}
+    return FVector2D();
 }
 
 
-void AHumanPlayer::HandleGameUnitClick(AGameUnit* ClickedUnit)
-{
-	if (!ClickedUnit)
-	{
-		return;
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("HumanPlayer: Unità cliccata (ID: %d) in posizione %s."),
-		ClickedUnit->GetGameUnitID(), *ClickedUnit->GetGridPosition().ToString());
-
-	if (GameMode)
-	{
-		// Se l'unità cliccata appartiene al giocatore corrente, selezionala per il movimento
-		if (ClickedUnit->GetPlayerOwner() == PlayerNumber)
-		{
-			GameMode->SetSelectedTile(ClickedUnit->GetGridPosition());
-		}
-		else
-		{
-			// Se l'unità cliccata è nemica, otteniamo la tile corrispondente
-			ATile* TargetTile = nullptr;
-			if (GameMode->GField && GameMode->GField->TileMap.Contains(ClickedUnit->GetGridPosition()))
-			{
-				TargetTile = GameMode->GField->TileMap[ClickedUnit->GetGridPosition()];
-			}
-
-			if (TargetTile)
-			{
-				UE_LOG(LogTemp, Log, TEXT("HumanPlayer: Unità nemica cliccata. Iniziamo l'attacco."));
-				ExecuteTheAttackForHumanPlayer(TargetTile);
-			}
-			else
-			{
-				UE_LOG(LogTemp, Warning, TEXT("HandleGameUnitClick: Impossibile trovare la tile corrispondente all'unità cliccata."));
-			}
-		}
-	}
-}
 
 
-void AHumanPlayer::ExecuteTheMoveForHumanPlayer(const ATile* EndTile)
-{
-	if (!EndTile)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("ExecuteTheMoveForHumanPlayer: EndTile è nullo."));
-		return;
-	}
 
-	UE_LOG(LogTemp, Log, TEXT("ExecuteTheMoveForHumanPlayer: Spostamento verso la tile in %s."), *EndTile->GetGridPosition().ToString());
-
-	if (GameMode)
-	{
-		// Chiamata al GameMode per eseguire il movimento, passando la posizione della tile di destinazione e indicando che si tratta di una mossa di gioco
-		GameMode->DoMove(EndTile->GetGridPosition(), true);
-	}
-}
-
-void AHumanPlayer::ExecuteTheAttackForHumanPlayer(const ATile* TargetTile)
-{
-	if (!TargetTile)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("ExecuteTheAttackForHumanPlayer: TargetTile is null."));
-		return;
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("HumanPlayer: Eseguo l'attacco sulla tile in %s."), *TargetTile->GetGridPosition().ToString());
-
-	if (GameMode)
-	{
-		// Chiama il metodo DoAttack passando la posizione della tile target e indicando che si tratta di una mossa di gioco
-		GameMode->DoAttack(TargetTile->GetGridPosition(), true);
-	}
-}
