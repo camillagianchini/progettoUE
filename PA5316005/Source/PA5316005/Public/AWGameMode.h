@@ -114,6 +114,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Unit Classes|Human")
     TSubclassOf<ABrawler> HPBrawlerClass;
 
+    // AAWGameMode.h
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Turn Management")
+    AGameUnit* SelectedUnit;
+
   
 
     // Fase corrente del gioco: Placement oppure Battle

@@ -133,6 +133,8 @@ int32 AGameUnit::GetDamageMax() const
 	return DamageMax;
 }
 
+
+
 TArray<FVector2D> AGameUnit::CalculateLegalMoves() const
 {
 	TArray<FVector2D> LegalMoves;

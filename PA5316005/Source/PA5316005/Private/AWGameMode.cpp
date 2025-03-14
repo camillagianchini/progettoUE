@@ -1,5 +1,6 @@
 #include "AWGameMode.h"
 #include "GameField.h"
+#include "Tile.h"
 #include "AWPlayerController.h"
 #include "HumanPlayer.h"
 #include "RandomPlayer.h"
@@ -64,7 +65,7 @@ void AAWGameMode::BeginPlay()
 
     // Calcola la posizione della camera e posiziona il HumanPlayer
     float CameraPosX = ((GField->TileSize * FieldSize) + ((FieldSize - 1) * GField->TileSize * GField->CellPadding)) * 0.5f;
-    float Zposition = 4000.0f; // Regola in base alla tua scena
+    float Zposition = 3500.0f; // Regola in base alla tua scena
     FVector CameraPos(CameraPosX, CameraPosX, Zposition);
     FRotator CameraRot(-90.0f, 0.0f, 0.0f);
     HumanPlayer->SetActorLocationAndRotation(CameraPos, CameraRot);
@@ -128,15 +129,29 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
             SpawnParams.Owner = this;
             FVector SpawnLocation = GField->GetRelativePositionByXYPosition(Position.X, Position.Y);
             // Aggiungiamo un offset Z se necessario, ad esempio:
-            SpawnLocation.Z += 50.0f;
+            SpawnLocation.Z += 5.0f;
 
             if (bPlaceSniper)
             {
                 if (AISniperClass) // Usa il blueprint assegnato
                 {
-                    World->SpawnActor<ASniper>(AISniperClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
-                    bSniperPlaced[1] = true;
-                    UE_LOG(LogTemp, Log, TEXT("AI ha piazzato uno Sniper in %s"), *Position.ToString());
+                    ASniper* SpawnedUnit = World->SpawnActor<ASniper>(AISniperClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
+                    if (SpawnedUnit)
+                    {
+                        bSniperPlaced.Add(1, true);
+                        // Aggiorna la tile: imposta lo stato a OCCUPIED e associa l'unità
+         
+                      
+                        UE_LOG(LogTemp, Log, TEXT("AI ha piazzato uno Sniper in %s"), *Position.ToString());
+                        if (GField && GField->TileMap.Contains(Position))
+                        {
+                            ATile* Tile = GField->TileMap[Position];
+                            if (Tile)
+                            {
+                                Tile->SetTileStatus(1, ETileStatus::OCCUPIED, SpawnedUnit);
+                            }
+                        }
+                    }
                 }
                 else
                 {
@@ -147,15 +162,28 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
             {
                 if (AIBrawlerClass) // Usa il blueprint assegnato
                 {
-                    World->SpawnActor<ABrawler>(AIBrawlerClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
-                    bBrawlerPlaced[1] = true;
-                    UE_LOG(LogTemp, Log, TEXT("AI ha piazzato un Brawler in %s"), *Position.ToString());
+                    ABrawler* SpawnedUnit = World->SpawnActor<ABrawler>(AIBrawlerClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
+                    if (SpawnedUnit)
+                    {
+                        bBrawlerPlaced.Add(1, true);
+                       
+                        UE_LOG(LogTemp, Log, TEXT("AI ha piazzato un Brawler in %s"), *Position.ToString());
+                        if (GField && GField->TileMap.Contains(Position))
+                        {
+                            ATile* Tile = GField->TileMap[Position];
+                            if (Tile)
+                            {
+                                Tile->SetTileStatus(1, ETileStatus::OCCUPIED, SpawnedUnit);
+                            }
+                        }
+                    }
                 }
                 else
                 {
                     UE_LOG(LogTemp, Warning, TEXT("AIBrawlerClass non assegnato!"));
                 }
             }
+
         }
         else
         {
@@ -176,7 +204,9 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
         // Tutte le unità sono state posizionate: passa alla fase di battaglia
         CurrentPhase = EGamePhase::Battle;
         UE_LOG(LogTemp, Log, TEXT("Tutte le unità posizionate. Passaggio alla fase di battaglia."));
+       
     }
+
     else
     {
         // Se non sono terminate, se il turno corrente è AI puoi chiamare nuovamente PlaceUnitForCurrentPlayer()
@@ -186,35 +216,40 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
             PlaceUnitForCurrentPlayer();
         }
     }
+
+    NextTurn();
 }
 
 
 void AAWGameMode::NextTurn()
 {
-    // Funzione da chiamare durante la fase Battle per gestire il cambio turno
+   
+
     if (CurrentPhase == EGamePhase::Battle)
     {
-        if (TutteLeUnitaHannoAgito(CurrentPlayer))
-        {
-            // Verifica le condizioni di vittoria
-            if (CondizioniDiVittoria())
-            {
-                EndGame();
-                return;
-            }
-            // Alterna il giocatore corrente
-            CurrentPlayer = (CurrentPlayer == 0) ? 1 : 0;
-            ResetActionsForPlayer(CurrentPlayer);
+       
 
-            // Aggiorna eventualmente il messaggio del turno (ad es. tramite il GameInstance)
-            UAWGameInstance* GameInstance = Cast<UAWGameInstance>(GetGameInstance());
-             if(GameInstance)
-             {
-                 GameInstance->SetTurnMessage((CurrentPlayer == 0) ? TEXT("Human Turn") : TEXT("AI Turn"));
+        // Aggiorna eventualmente il messaggio del turno
+        UAWGameInstance* GI = Cast<UAWGameInstance>(GetGameInstance());
+        if (GI)
+        {
+            GI->SetTurnMessage((CurrentPlayer == 0) ? TEXT("Human Turn") : TEXT("AI Turn"));
+        }
+
+        // Se il giocatore attivo è l'AI, chiama OnTurn() dell'AI
+        if (CurrentPlayer == 1)
+        {
+            // Assicurati che RandomPlayer sia tra i giocatori e chiama OnTurn()
+            ARandomPlayer* AIPlayer = Cast<ARandomPlayer>(Players[1]);
+            if (AIPlayer)
+            {
+                AIPlayer->OnTurn();
             }
         }
+        // Se il giocatore attivo è l'umano, l'input (click) verrà gestito tramite OnClick()
     }
 }
+
 
 // Le seguenti funzioni sono stub da completare secondo la logica del tuo gioco
 

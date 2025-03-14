@@ -26,25 +26,21 @@ void AAWPlayerController::BeginPlay()
 {
     Super::BeginPlay();
 
-    if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
-        ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+    if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
     {
         Subsystem->AddMappingContext(AWContext, 0);
-
-        if (AWContext)
-        {
-            UE_LOG(LogTemp, Log, TEXT("Added Mapping Context: %s"), *AWContext->GetName());
-        }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("AWContext è nullptr."));
-        }
+        UE_LOG(LogTemp, Log, TEXT("Added Mapping Context: %s"), AWContext ? *AWContext->GetName() : TEXT("None"));
     }
     else
     {
         UE_LOG(LogTemp, Warning, TEXT("Subsystem not found!"));
     }
+
+    // Imposta l'Input Mode per il gioco
+    FInputModeGameOnly InputMode;
+    SetInputMode(InputMode);
 }
+
 
 
 void AAWPlayerController::SetupInputComponent()
@@ -53,28 +49,34 @@ void AAWPlayerController::SetupInputComponent()
 
     if (!ClickAction)
     {
-        UE_LOG(LogTemp, Warning, TEXT("ClickAction è nullptr!"));
+        UE_LOG(LogTemp, Warning, TEXT("ClickAction è nullptr! Assicurati di assegnarlo nell'editor."));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Log, TEXT("ClickAction assegnato: %s"), *ClickAction->GetName());
     }
 
     if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(InputComponent))
     {
         EnhancedInputComponent->BindAction(ClickAction, ETriggerEvent::Triggered, this, &AAWPlayerController::ClickOnGrid);
-        UE_LOG(LogTemp, Log, TEXT("BindAction per ClickAction effettuato con successo."));
+        UE_LOG(LogTemp, Log, TEXT("BindAction completato per ClickAction."));
     }
 }
+
 
 
 void AAWPlayerController::ClickOnGrid()
 {
     UE_LOG(LogTemp, Warning, TEXT("ClickOnGrid() triggered!"));
-	// Se il Pawn controllato è un HumanPlayer, chiamalo per gestire il click
-	if (AHumanPlayer* HumanPlayer = Cast<AHumanPlayer>(GetPawn()))
-	{
-		HumanPlayer->OnClick();
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Il Pawn posseduto non è un HumanPlayer."));
-	}
+    if (AHumanPlayer* HumanPlayer = Cast<AHumanPlayer>(GetPawn()))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Trovato HumanPlayer!"));
+        HumanPlayer->OnClick();
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Il Pawn posseduto non è un HumanPlayer."));
+    }
 }
+
 

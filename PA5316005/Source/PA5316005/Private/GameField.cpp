@@ -14,11 +14,51 @@ AGameField::AGameField()
 	Size = 25;
 	TileSize = 150;
 	CellPadding = 0;
-	NormalizedCellPadding = 0.0f;
+	NormalizedCellPadding = 1;
 	GameUnitScalePercentage = 100;
 	ListOfMovesWidgetRef = nullptr;
 
 }
+
+TArray<FVector2D> AGameField::GetValidMoves(AGameUnit* Unit) const
+{
+	TArray<FVector2D> ValidMoves;
+
+	if (!Unit)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("GetValidMoves: Unità nulla"));
+		return ValidMoves;
+	}
+
+	// Calcola le mosse legali base per l'unità
+	TArray<FVector2D> LegalMoves = Unit->CalculateLegalMoves();
+
+	// Filtra ogni mossa: controlla se è dentro la griglia e se la tile è libera
+	for (const FVector2D& MovePos : LegalMoves)
+	{
+		// Controlla se la posizione è valida all'interno della griglia
+		if (!IsValidPosition(MovePos))
+		{
+			continue;
+		}
+
+		// Recupera la tile corrispondente
+		ATile* Tile = nullptr;
+		if (TileMap.Contains(MovePos))
+		{
+			Tile = TileMap[MovePos];
+		}
+
+		// Se la tile esiste e risulta libera, la aggiungiamo
+		if (Tile && Tile->GetTileStatus() == ETileStatus::EMPTY)
+		{
+			ValidMoves.Add(MovePos);
+		}
+	}
+
+	return ValidMoves;
+}
+
 
 void AGameField::OnConstruction(const FTransform& Transform)
 {
@@ -85,10 +125,17 @@ FVector AGameField::GetRelativePositionByXYPosition(const int32 InX, const int32
 
 FVector2D AGameField::GetXYPositionByRelativeLocation(const FVector& Location) const
 {
-	const double x = Location[0] / (TileSize * NormalizedCellPadding);
-	const double y = Location[1] / (TileSize * NormalizedCellPadding);
-	return FVector2D(x, y);
+	// Calcola la posizione relativa rispetto all'origine del GameField
+	FVector RelativeLocation = Location - GetActorLocation();
+
+	// Dividi per la dimensione del tile per ottenere la griglia
+	double x = RelativeLocation.X / (TileSize * NormalizedCellPadding);
+	double y = RelativeLocation.Y / (TileSize * NormalizedCellPadding);
+
+	return FVector2D(FMath::RoundToFloat(x), FMath::RoundToFloat(y));
 }
+
+
 
 void AGameField::GenerateField()
 {
@@ -351,6 +398,129 @@ ATile* AGameField::GetRandomFreeTile() const
 }
 
 
+void AGameField::MoveUnit(AGameUnit* Unit, const FVector2D& NewPos)
+{
+	if (!Unit)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("MoveUnit: Unità nulla!"));
+		return;
+	}
+
+	// Ottieni la posizione di partenza
+	FVector2D OldPos = Unit->GetGridPosition();
+
+	// Verifica che la tile di partenza esista ed è occupata da questa unità
+	if (!TileMap.Contains(OldPos))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("MoveUnit: la tile di partenza %s non esiste nella mappa."), *OldPos.ToString());
+		return;
+	}
+
+	ATile* OldTile = TileMap[OldPos];
+
+
+	// Verifica che la tile di destinazione sia valida e libera
+	if (!IsValidPosition(NewPos) || !TileMap.Contains(NewPos))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("MoveUnit: la tile di destinazione %s non è valida."), *NewPos.ToString());
+		return;
+	}
+
+	ATile* NewTile = TileMap[NewPos];
+	if (NewTile->GetTileStatus() != ETileStatus::EMPTY)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("MoveUnit: la tile di destinazione %s non è libera."), *NewPos.ToString());
+		return;
+	}
+
+	// Aggiorna la tile di partenza (diventa EMPTY)
+	OldTile->SetTileStatus(NOT_ASSIGNED, ETileStatus::EMPTY, nullptr);
+
+	// Aggiorna la tile di destinazione (diventa OCCUPIED)
+	NewTile->SetTileStatus(Unit->GetPlayerOwner(), ETileStatus::OCCUPIED, Unit);
+
+	// Aggiorna la posizione interna dell'unità
+	Unit->SetGridPosition(NewPos.X, NewPos.Y);
+
+
+	// Se vuoi spostare anche visivamente la mesh, puoi calcolare la nuova posizione in world space
+	// e chiamare Unit->SetActorLocation(...) o fare un Lerp. Qui facciamo un teletrasporto veloce:
+	FVector NewWorldPos = GetRelativePositionByXYPosition(NewPos.X, NewPos.Y);
+	Unit->SetActorLocation(FVector(NewWorldPos.X, NewWorldPos.Y, Unit->GetActorLocation().Z));
+
+	UE_LOG(LogTemp, Log, TEXT("MoveUnit: Unità ID %d mossa da %s a %s"),
+		Unit->GetGameUnitID(), *OldPos.ToString(), *NewPos.ToString());
+}
+
+void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
+{
+	if (!Attacker)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AttackUnit: Attacker nullo!"));
+		return;
+	}
+
+	// Verifica che la tile di destinazione esista
+	if (!IsValidPosition(TargetPos) || !TileMap.Contains(TargetPos))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AttackUnit: Posizione di destinazione %s non valida."), *TargetPos.ToString());
+		return;
+	}
+
+	ATile* TargetTile = TileMap[TargetPos];
+	if (!TargetTile || TargetTile->GetTileStatus() != ETileStatus::OCCUPIED)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AttackUnit: Nessuna unità da attaccare sulla tile %s."), *TargetPos.ToString());
+		return;
+	}
+
+	AGameUnit* Defender = TargetTile->GetGameUnit();
+	if (!Defender)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AttackUnit: Tile occupata ma unità nulla?"));
+		return;
+	}
+
+	// Verifica che sia un'unità nemica
+	if (Defender->GetPlayerOwner() == Attacker->GetPlayerOwner())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AttackUnit: Non puoi attaccare un'unità tua!"));
+		return;
+	}
+
+	// Calcolo del danno
+	// Esempio: valore random tra DamageMin e DamageMax dell'Attacker
+	int32 Damage = FMath::RandRange(Attacker->GetDamageMin(), Attacker->GetDamageMax());
+	UE_LOG(LogTemp, Log, TEXT("AttackUnit: L'unità ID %d infligge %d danni a unità ID %d"),
+		Attacker->GetGameUnitID(), Damage, Defender->GetGameUnitID());
+
+	// Applica il danno
+	Defender->TakeDamageUnit(Damage);
+
+	// Se il Defender è morto, rimuovilo dalla tile e distruggilo
+	if (Defender->IsDead())
+	{
+		UE_LOG(LogTemp, Log, TEXT("AttackUnit: L'unità ID %d è morta."), Defender->GetGameUnitID());
+		// Aggiorna la tile
+		TargetTile->SetTileStatus(NOT_ASSIGNED, ETileStatus::EMPTY, nullptr);
+		// Rimuovi anche dalla mappa (se la usi)
+		// Trova la chiave e rimuovi Defender da GameUnitMap
+		for (auto It = GameUnitMap.CreateIterator(); It; ++It)
+		{
+			if (It.Value() == Defender)
+			{
+				It.RemoveCurrent();
+				break;
+			}
+		}
+		Defender->Destroy();
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("AttackUnit: L'unità ID %d sopravvive con %d HP"),
+			Defender->GetGameUnitID(), Defender->GetHitPoints());
+	}
+}
 
 
 

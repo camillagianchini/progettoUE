@@ -107,4 +107,14 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void ResetField();
+
+	UFUNCTION(BlueprintCallable, Category = "Game Field")
+	TArray<FVector2D> GetValidMoves(class AGameUnit* Unit) const;
+
+
+	UFUNCTION(BlueprintCallable, Category = "Game Field")
+	void MoveUnit(AGameUnit* Unit, const FVector2D& NewPos);
+
+	UFUNCTION(BlueprintCallable, Category = "Game Field")
+	void AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos);
 };

@@ -1,47 +1,21 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// RandomPlayer.h
 
 #pragma once
 
-#include "AWGameInstance.h"
-#include "PlayerInterface.h"
-#include "AWGameMode.h"
-
 #include "CoreMinimal.h"
-#include "GameFramework/Pawn.h"
-#include "Kismet/GameplayStatics.h"
+#include "PlayerInterface.h"
 #include "RandomPlayer.generated.h"
 
 UCLASS()
-class PA5316005_API ARandomPlayer : public APawn, public IPlayerInterface
+class PA5316005_API ARandomPlayer : public AActor, public IPlayerInterface
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	// Sets default values for this pawn's properties
-	ARandomPlayer();
+    virtual void OnTurn() override;
 
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-	UAWGameInstance* GameInstance;
-
-	AAWGameMode* GameMode;
-
-	virtual void OnTurn() override;
-	virtual void OnWin() override;
-	virtual void OnLose() override;
-
-	UFUNCTION(BlueprintCallable)
-	void MakeRandomAttack();
-
-	UFUNCTION(BlueprintCallable)
-	void MakeRandomMove();
+private:
+    void PerformRandomActionOnUnit(class AGameUnit* Unit);
 };
+
 

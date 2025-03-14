@@ -29,17 +29,33 @@ ATile::ATile()
 	PlayerOwner = -1;
 }
 
+
+
 void ATile::BeginPlay()
 {
 	Super::BeginPlay();
+
 }
 
 void ATile::SetTileStatus(const int32 TileOwner, const ETileStatus TileStatus, AGameUnit* TileGameUnit)
 {
-	PlayerOwner = TileOwner;
-	Status = TileStatus;
-	GameUnit = TileGameUnit;
+    PlayerOwner = TileOwner;
+    Status = TileStatus;
+    GameUnit = TileGameUnit;
+
+    // Aggiorna anche TileGameStatus in base al TileStatus
+    if (TileStatus == ETileStatus::EMPTY)
+    {
+        TileGameStatus = ETileGameStatus::FREE;
+    }
+    else // Occupied
+    {
+        TileGameStatus = ETileGameStatus::SELECTED; // o un altro valore che ritieni appropriato
+    }
+
+    SetTileMaterial();
 }
+
 
 void ATile::SetTileGameStatus(ETileGameStatus NewTileGameStatus)
 {
@@ -61,41 +77,38 @@ void ATile::SetGridPosition(const double InX, const double InY)
 
 void ATile::SetTileMaterial() const
 {
-    // Verifica che il componente esista
     if (!StaticMeshComponent)
     {
         return;
     }
 
-    // Crea o ottieni l'istanza dinamica del materiale sullo slot 0
+    // Crea o ottieni l'istanza dinamica del materiale
     UMaterialInstanceDynamic* DynMaterial = StaticMeshComponent->CreateDynamicMaterialInstance(0);
     if (!DynMaterial)
     {
         return;
     }
 
-    // Definisci il colore da applicare in base allo stato della tile
-    FLinearColor NewColor = FLinearColor::White; // Colore di default per FREE
-
-    switch (TileGameStatus)
+    // Seleziona un colore in base allo stato della tile
+    FLinearColor NewColor = FLinearColor::White; // Default per FREE
+    switch (TileGameStatus)  // Se usi TileGameStatus, assicurati di averlo aggiornato in SetTileStatus, oppure usa direttamente lo stato "Status"
     {
     case ETileGameStatus::FREE:
-        NewColor = FLinearColor::White; // Puoi scegliere un colore base neutro
+        NewColor = FLinearColor::White;
         break;
     case ETileGameStatus::SELECTED:
-        NewColor = FLinearColor::Blue;  // Evidenzia l'unità selezionata
+        NewColor = FLinearColor::Blue;
         break;
     case ETileGameStatus::LEGAL_MOVE:
-        NewColor = FLinearColor::Green; // Evidenzia le mosse legali
+        NewColor = FLinearColor::Green;
         break;
     case ETileGameStatus::CAN_ATTACK:
-        NewColor = FLinearColor::Red;   // Evidenzia possibili attacchi
+        NewColor = FLinearColor::Red;
         break;
     default:
         break;
     }
 
-    // Assicurati che il materiale usato abbia un parametro colore (ad es. "BaseColor")
     DynMaterial->SetVectorParameterValue(TEXT("BaseColor"), NewColor);
 }
 
@@ -131,15 +144,14 @@ AGameUnit* ATile::GetGameUnit() const
 
 FString ATile::GameStatusToString() const
 {
-    switch (TileGameStatus)
+    switch (Status)
     {
-    case ETileGameStatus::FREE: return FString("FREE");
-    case ETileGameStatus::SELECTED: return FString("SELECTED");
-    case ETileGameStatus::LEGAL_MOVE: return FString("LEGAL_MOVE");
-    case ETileGameStatus::CAN_ATTACK: return FString("CAN_ATTACK");
-    default: return FString("Unknown");
-   }
+    case ETileStatus::EMPTY:    return TEXT("EMPTY");
+    case ETileStatus::OCCUPIED: return TEXT("OCCUPIED");
+    default:                    return TEXT("Unknown");
+    }
 }
+
 
 
 
