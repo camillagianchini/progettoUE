@@ -82,6 +82,8 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	AAWGameMode* GameMode;
 
+
+
 public:
 	// ************ SETTERS ************
 	// Set a unique GameUnit ID (e.g., auto-increment)
@@ -108,6 +110,7 @@ public:
 	// Set the unit's Damage values (min and max)
 	void SetDamage(int32 NewDamageMin, int32 NewDamageMax);
 
+	bool IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const;
 
 	// ************ GETTERS ************
 	// Get the unique GameUnit ID
@@ -140,7 +143,7 @@ public:
 	// ************ METHODS ************
 	// Calculate and return legal moves based on MovementRange.
 	// Only horizontal and vertical moves are considered.
-	virtual TArray<FVector2D> CalculateLegalMoves() const;
+	virtual TArray<FVector2D> CalculateLegalMoves();
 
 	// Calcola e restituisce le mosse legali per l'attacco basate su AttackRange.
 // Solo spostamenti orizzontali e verticali sono considerati.

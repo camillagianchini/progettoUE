@@ -1,6 +1,7 @@
 #include "GameUnit.h"
 #include "GameField.h"
 #include "AWGameMode.h"
+#include "GameField.h"
 #include "UObject/ConstructorHelpers.h"
 
 int32 AGameUnit::NewGameUnitID = 0;
@@ -135,25 +136,101 @@ int32 AGameUnit::GetDamageMax() const
 
 
 
-TArray<FVector2D> AGameUnit::CalculateLegalMoves() const
+TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 {
-	TArray<FVector2D> LegalMoves;
+	TArray<FVector2D> Result;
+	if (!GameMode || !GameMode->GField) return Result;
 
-	// Calcola le mosse possibili in orizzontale e verticale basate sul MovementRange
-	for (int32 Offset = 1; Offset <= MovementRange; Offset++)
+	// BFS structures
+	TQueue<FVector2D> Frontier;
+	TSet<FVector2D> Visited;
+	TMap<FVector2D, int32> DistMap;
+
+	FVector2D StartPos = GetGridPosition();
+	Frontier.Enqueue(StartPos);
+	Visited.Add(StartPos);
+	DistMap.Add(StartPos, 0);
+
+	while (!Frontier.IsEmpty())
 	{
-		// Movimento a destra
-		LegalMoves.Add(FVector2D(GameUnitGridPosition.X + Offset, GameUnitGridPosition.Y));
-		// Movimento a sinistra
-		LegalMoves.Add(FVector2D(GameUnitGridPosition.X - Offset, GameUnitGridPosition.Y));
-		// Movimento verso l'alto
-		LegalMoves.Add(FVector2D(GameUnitGridPosition.X, GameUnitGridPosition.Y + Offset));
-		// Movimento verso il basso
-		LegalMoves.Add(FVector2D(GameUnitGridPosition.X, GameUnitGridPosition.Y - Offset));
+		FVector2D Current;
+		Frontier.Dequeue(Current);
+
+		int32 CurrentDist = DistMap[Current];
+
+		// 4 direzioni
+		static TArray<FVector2D> Dirs = {
+			FVector2D(1,0), FVector2D(-1,0),
+			FVector2D(0,1), FVector2D(0,-1)
+		};
+
+		for (auto& Dir : Dirs)
+		{
+			FVector2D Next = Current + Dir;
+			int32 NextDist = CurrentDist + 1;
+			if (NextDist <= MovementRange)
+			{
+				// Se stiamo controllando la cella di partenza o no
+				bool bIsStart = (Next == StartPos);
+				// Controlla se la cella Next è valida
+				if (IsValidGridCell(Next, bIsStart) && !Visited.Contains(Next))
+				{
+					// Se non è la cella di partenza, aggiungila alle mosse
+					if (!bIsStart)
+					{
+						Result.Add(Next);
+					}
+					Frontier.Enqueue(Next);
+					Visited.Add(Next);
+					DistMap.Add(Next, NextDist);
+				}
+			}
+		}
+	}
+	return Result;
+}
+
+
+bool AGameUnit::IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const
+{
+	if (!GameMode || !GameMode->GField)
+		return false;
+
+	// Controllo limiti della griglia
+	AGameField* GF = GameMode->GField;
+	if (CellPos.X < 0 || CellPos.X >= GF->Size ||
+		CellPos.Y < 0 || CellPos.Y >= GF->Size)
+	{
+		return false;
 	}
 
-	return LegalMoves;
+	// Ottieni la tile
+	ATile* Tile = GF->GetTileMap()[CellPos];
+	if (!Tile)
+		return false;
+
+	// Se è la cella di partenza, consentila anche se "OCCUPIED" dalla stessa unità
+	if (bIsStart)
+	{
+		// Se c'è un'unità su questa tile...
+		if (Tile->GetTileStatus() == ETileStatus::OCCUPIED)
+		{
+			AGameUnit* Occupant = Tile->GetGameUnit();
+			// ... e NON è la stessa unità, blocca
+			if (Occupant != this)
+				return false;
+		}
+		return true; // Ok, è la cella di partenza occupata da me stesso
+	}
+	else
+	{
+		// Per le celle successive, devono essere strictly EMPTY
+		return (Tile->GetTileStatus() == ETileStatus::EMPTY);
+	}
 }
+
+
+
 
 TArray<FVector2D> AGameUnit::CalculateAttackMoves() const
 {

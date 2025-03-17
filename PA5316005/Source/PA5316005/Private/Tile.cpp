@@ -37,24 +37,19 @@ void ATile::BeginPlay()
 
 }
 
-void ATile::SetTileStatus(const int32 TileOwner, const ETileStatus TileStatus, AGameUnit* TileGameUnit)
+void ATile::SetTileStatus(int32 TileOwner, ETileStatus NewTileStatus, AGameUnit* TileGameUnit)
 {
     PlayerOwner = TileOwner;
-    Status = TileStatus;
+    Status = NewTileStatus;
     GameUnit = TileGameUnit;
 
-    // Aggiorna anche TileGameStatus in base al TileStatus
-    if (TileStatus == ETileStatus::EMPTY)
-    {
-        TileGameStatus = ETileGameStatus::FREE;
-    }
-    else // Occupied
-    {
-        TileGameStatus = ETileGameStatus::SELECTED; // o un altro valore che ritieni appropriato
-    }
+    // Non toccare TileGameStatus (niente FREE/SELECTED qui)
+    SetTileMaterial(); // Se vuoi, lo chiami, ma non alteri TileGameStatus
 
-    SetTileMaterial();
+    // Aggiorna solo la mesh per riflettere "occupato" o "vuoto" se ti serve
+    // Oppure gestisci la parte visiva con un materiale separato
 }
+
 
 
 void ATile::SetTileGameStatus(ETileGameStatus NewTileGameStatus)
@@ -82,16 +77,19 @@ void ATile::SetTileMaterial() const
         return;
     }
 
-    // Crea o ottieni l'istanza dinamica del materiale
+    // Crea un'istanza dinamica del materiale
     UMaterialInstanceDynamic* DynMaterial = StaticMeshComponent->CreateDynamicMaterialInstance(0);
     if (!DynMaterial)
     {
+        UE_LOG(LogTemp, Error, TEXT("DynMaterial == nullptr!"));
         return;
     }
 
-    // Seleziona un colore in base allo stato della tile
-    FLinearColor NewColor = FLinearColor::White; // Default per FREE
-    switch (TileGameStatus)  // Se usi TileGameStatus, assicurati di averlo aggiornato in SetTileStatus, oppure usa direttamente lo stato "Status"
+    // 1) Dichiara e inizializza la variabile FLinearColor
+    FLinearColor NewColor = FLinearColor::White; // default
+
+    // 2) In base allo stato della tile, scegli il colore
+    switch (TileGameStatus)
     {
     case ETileGameStatus::FREE:
         NewColor = FLinearColor::White;
@@ -109,8 +107,10 @@ void ATile::SetTileMaterial() const
         break;
     }
 
+    // 3) Usa la variabile NewColor per impostare il parametro “BaseColor”
     DynMaterial->SetVectorParameterValue(TEXT("BaseColor"), NewColor);
 }
+
 
 ETileStatus ATile::GetTileStatus() const
 {
