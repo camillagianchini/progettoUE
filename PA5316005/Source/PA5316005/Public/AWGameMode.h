@@ -36,7 +36,7 @@ public:
 
     // Funzioni per la fase di battaglia
     void NextTurn();
-    bool TutteLeUnitaHannoAgito(int32 Player);
+    bool TutteLeUnitaHannoAgito(int32 Player) const;
     bool CondizioniDiVittoria();
     void ResetActionsForPlayer(int32 Player);
     void EndGame();
@@ -66,6 +66,9 @@ public:
     // Indice del giocatore corrente: 0 = Human, 1 = AI
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     int32 CurrentPlayer;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Turn Management")
+    int32 StartingPlayer;
 
     // Dimensione del campo (griglia NxN)
     UPROPERTY(EditAnywhere, BlueprintReadOnly)

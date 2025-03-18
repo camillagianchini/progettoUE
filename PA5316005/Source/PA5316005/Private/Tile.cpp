@@ -77,39 +77,57 @@ void ATile::SetTileMaterial() const
         return;
     }
 
-    // Crea un'istanza dinamica del materiale
-    UMaterialInstanceDynamic* DynMaterial = StaticMeshComponent->CreateDynamicMaterialInstance(0);
-    if (!DynMaterial)
+    // Se la tile è un ostacolo, usa uno dei materiali d'ostacolo.
+    if (GetTileStatus() == ETileStatus::OBSTACLE)
     {
-        UE_LOG(LogTemp, Error, TEXT("DynMaterial == nullptr!"));
+        // Supponiamo che ObstacleMaterial1, ObstacleMaterial2 e ObstacleMaterial3 siano
+        // membri UPROPERTY già impostati nel Blueprint o nel codice.
+        int32 RandomIndex = FMath::RandRange(1, 3);
+        UMaterialInterface* ChosenMaterial = nullptr;
+        switch (RandomIndex)
+        {
+        case 1: ChosenMaterial = ObstacleMaterial1; break;
+        case 2: ChosenMaterial = ObstacleMaterial2; break;
+        case 3: ChosenMaterial = ObstacleMaterial3; break;
+        }
+        if (ChosenMaterial)
+        {
+            StaticMeshComponent->SetMaterial(0, ChosenMaterial);
+        }
         return;
     }
-
-    // 1) Dichiara e inizializza la variabile FLinearColor
-    FLinearColor NewColor = FLinearColor::White; // default
-
-    // 2) In base allo stato della tile, scegli il colore
-    switch (TileGameStatus)
+    else
     {
-    case ETileGameStatus::FREE:
-        NewColor = FLinearColor::White;
-        break;
-    case ETileGameStatus::SELECTED:
-        NewColor = FLinearColor::Blue;
-        break;
-    case ETileGameStatus::LEGAL_MOVE:
-        NewColor = FLinearColor::Green;
-        break;
-    case ETileGameStatus::CAN_ATTACK:
-        NewColor = FLinearColor::Red;
-        break;
-    default:
-        break;
-    }
+        // Per le tile non ostacolo, creiamo un'istanza dinamica del materiale
+        UMaterialInstanceDynamic* DynMaterial = StaticMeshComponent->CreateDynamicMaterialInstance(0);
+        if (!DynMaterial)
+        {
+            return;
+        }
 
-    // 3) Usa la variabile NewColor per impostare il parametro “BaseColor”
-    DynMaterial->SetVectorParameterValue(TEXT("BaseColor"), NewColor);
+        // Imposta il colore in base allo stato di evidenziazione della tile (TileGameStatus)
+        FLinearColor NewColor = FLinearColor::White; // Default per FREE
+        switch (TileGameStatus)
+        {
+        case ETileGameStatus::FREE:
+            NewColor = FLinearColor::White;
+            break;
+        case ETileGameStatus::SELECTED:
+            NewColor = FLinearColor::Blue;
+            break;
+        case ETileGameStatus::LEGAL_MOVE:
+            NewColor = FLinearColor::Green;
+            break;
+        case ETileGameStatus::CAN_ATTACK:
+            NewColor = FLinearColor::Red;
+            break;
+        default:
+            break;
+        }
+        DynMaterial->SetVectorParameterValue(TEXT("BaseColor"), NewColor);
+    }
 }
+
 
 
 ETileStatus ATile::GetTileStatus() const
@@ -148,6 +166,7 @@ FString ATile::GameStatusToString() const
     {
     case ETileStatus::EMPTY:    return TEXT("EMPTY");
     case ETileStatus::OCCUPIED: return TEXT("OCCUPIED");
+    case ETileStatus::OBSTACLE: return TEXT("OBSTACLE");
     default:                    return TEXT("Unknown");
     }
 }

@@ -20,44 +20,6 @@ AGameField::AGameField()
 
 }
 
-TArray<FVector2D> AGameField::GetValidMoves(AGameUnit* Unit) const
-{
-	TArray<FVector2D> ValidMoves;
-
-	if (!Unit)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("GetValidMoves: Unità nulla"));
-		return ValidMoves;
-	}
-
-	// Calcola le mosse legali base per l'unità
-	TArray<FVector2D> LegalMoves = Unit->CalculateLegalMoves();
-
-	// Filtra ogni mossa: controlla se è dentro la griglia e se la tile è libera
-	for (const FVector2D& MovePos : LegalMoves)
-	{
-		// Controlla se la posizione è valida all'interno della griglia
-		if (!IsValidPosition(MovePos))
-		{
-			continue;
-		}
-
-		// Recupera la tile corrispondente
-		ATile* Tile = nullptr;
-		if (TileMap.Contains(MovePos))
-		{
-			Tile = TileMap[MovePos];
-		}
-
-		// Se la tile esiste e risulta libera, la aggiungiamo
-		if (Tile && Tile->GetTileStatus() == ETileStatus::EMPTY)
-		{
-			ValidMoves.Add(MovePos);
-		}
-	}
-
-	return ValidMoves;
-}
 
 
 void AGameField::OnConstruction(const FTransform& Transform)
@@ -71,17 +33,14 @@ void AGameField::BeginPlay()
 {
 	Super::BeginPlay();
 
-	//if (ListOfMovesWidgetRef)
-	//{
-		//ListOfMovesWidgetRef->AddToViewport(0);
-	//}
-
 	if (TileArray.Num() == 0)
 	{
 		GenerateField();
+		// Chiama la generazione degli ostacoli, ad esempio con il 15% di ostacoli
+		GenerateObstacles(0.15f);
 	}
-
 }
+
 
 void AGameField::SetSelectedTile(FVector2D Position)
 {
@@ -229,6 +188,10 @@ void AGameField::GenerateGameUnit(FVector2D Position, int32 Player)
 	if (NewUnit)
 	{
 		NewUnit->SetPlayerOwner(Player);
+		// Aggiorna la posizione della griglia per la nuova unità:
+		NewUnit->SetGridPosition(Position.X, Position.Y);
+		UE_LOG(LogTemp, Warning, TEXT("Unità ID=%d posizionata in (%f, %f)"),
+			NewUnit->GetGameUnitID(), NewUnit->GetGridPosition().X, NewUnit->GetGridPosition().Y);
 
 		// Aggiorna lo stato della tile: ora è occupata dall'unità appena spawnata
 		LocalSelectedTile->SetTileStatus(Player, ETileStatus::OCCUPIED, NewUnit);
@@ -237,13 +200,18 @@ void AGameField::GenerateGameUnit(FVector2D Position, int32 Player)
 		int32 NewUnitKey = GameUnitMap.Num();
 		GameUnitMap.Add(NewUnitKey, NewUnit);
 
-		UE_LOG(LogTemp, Log, TEXT("Unità di tipo %s spawnata in %s per il player %d"), *T::StaticClass()->GetName(), *Position.ToString(), Player);
+		UE_LOG(LogTemp, Log, TEXT("Unità di tipo %s spawnata in %s per il player %d"),
+			*T::StaticClass()->GetName(), *Position.ToString(), Player);
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("Spawn dell'unità di tipo %s fallito in posizione %s"), *T::StaticClass()->GetName(), *Position.ToString());
+		UE_LOG(LogTemp, Error, TEXT("Spawn dell'unità di tipo %s fallito in posizione %s"),
+			*T::StaticClass()->GetName(), *Position.ToString());
 	}
 }
+
+
+
 
 
 
@@ -339,6 +307,30 @@ void AGameField::ShowLegalMovesInTheField()
 		CurrentTile->SetTileMaterial();
 	}
 }
+
+void AGameField::GenerateObstacles(float ObstaclePercentage)
+{
+	UE_LOG(LogTemp, Warning, TEXT("GenerateObstacles chiamata con perc=%f"), ObstaclePercentage);
+
+	int32 TotalCells = Size * Size;
+	int32 ObstaclesToPlace = FMath::RoundToInt(TotalCells * ObstaclePercentage);
+
+	int32 Placed = 0;
+	while (Placed < ObstaclesToPlace)
+	{
+		int32 RandIndex = FMath::RandRange(0, TileArray.Num() - 1);
+		ATile* RandTile = TileArray[RandIndex];
+		if (RandTile && RandTile->GetTileStatus() == ETileStatus::EMPTY)
+		{
+			RandTile->SetTileStatus(-1, ETileStatus::OBSTACLE, nullptr);
+			RandTile->SetTileMaterial();
+			UE_LOG(LogTemp, Warning, TEXT("Piazzato ostacolo sulla tile %s"), *RandTile->GetGridPosition().ToString());
+			Placed++;
+		}
+	}
+}
+
+
 
 void AGameField::ResetField()
 {

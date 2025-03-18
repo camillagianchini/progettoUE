@@ -20,6 +20,7 @@ AGameUnit::AGameUnit()
 	StaticMeshComponent->SetupAttachment(Scene);
 
 	// Inizializza le proprietà della GameUnit
+	bHasActed = false;
 	GameUnitGridPosition = FVector2D(-1, -1);
 	PlayerOwner = -1;
 	GameUnitID = -100;
@@ -138,44 +139,54 @@ int32 AGameUnit::GetDamageMax() const
 
 TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 {
-	TArray<FVector2D> Result;
-	if (!GameMode || !GameMode->GField) return Result;
 
-	// BFS structures
+	TArray<FVector2D> Result;
+	if (!GameMode || !GameMode->GField)
+		return Result;
+	
+	FVector2D StartPos = GetGridPosition();
+
+	UE_LOG(LogTemp, Warning, TEXT("CalculateLegalMoves chiamato per unità ID=%d, StartPos=(%.0f, %.0f), MovementRange=%d"),
+		GetGameUnitID(), StartPos.X, StartPos.Y, MovementRange);
+
+
+	// Strutture BFS
 	TQueue<FVector2D> Frontier;
 	TSet<FVector2D> Visited;
 	TMap<FVector2D, int32> DistMap;
 
-	FVector2D StartPos = GetGridPosition();
+
+	// Inserisci la cella di partenza manualmente, senza controllo
 	Frontier.Enqueue(StartPos);
 	Visited.Add(StartPos);
 	DistMap.Add(StartPos, 0);
+
+	// Direzioni verticali/orizzontali
+	static TArray<FVector2D> Dirs = {
+		FVector2D(1, 0), FVector2D(-1, 0),
+		FVector2D(0, 1), FVector2D(0, -1)
+	};
 
 	while (!Frontier.IsEmpty())
 	{
 		FVector2D Current;
 		Frontier.Dequeue(Current);
-
+		UE_LOG(LogTemp, Warning, TEXT("BFS Current = (%.0f, %.0f), Dist = %d"),
+			Current.X, Current.Y, DistMap[Current]);
 		int32 CurrentDist = DistMap[Current];
 
-		// 4 direzioni
-		static TArray<FVector2D> Dirs = {
-			FVector2D(1,0), FVector2D(-1,0),
-			FVector2D(0,1), FVector2D(0,-1)
-		};
-
+		// Espandi nei 4 vicini
 		for (auto& Dir : Dirs)
 		{
 			FVector2D Next = Current + Dir;
 			int32 NextDist = CurrentDist + 1;
-			if (NextDist <= MovementRange)
+			if (NextDist <= MovementRange && !Visited.Contains(Next))
 			{
-				// Se stiamo controllando la cella di partenza o no
+				// Imposta il flag bIsStart: sarà true solo se Next è la cella di partenza
 				bool bIsStart = (Next == StartPos);
-				// Controlla se la cella Next è valida
-				if (IsValidGridCell(Next, bIsStart) && !Visited.Contains(Next))
+				if (IsValidGridCell(Next, bIsStart))
 				{
-					// Se non è la cella di partenza, aggiungila alle mosse
+					// Aggiungi Next alle mosse se non è la cella di partenza
 					if (!bIsStart)
 					{
 						Result.Add(Next);
@@ -191,43 +202,79 @@ TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 }
 
 
+
+
 bool AGameUnit::IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const
 {
-	if (!GameMode || !GameMode->GField)
-		return false;
+	UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell(%.0f, %.0f), bIsStart=%s"),
+		CellPos.X, CellPos.Y, bIsStart ? TEXT("true") : TEXT("false"));
 
-	// Controllo limiti della griglia
-	AGameField* GF = GameMode->GField;
-	if (CellPos.X < 0 || CellPos.X >= GF->Size ||
-		CellPos.Y < 0 || CellPos.Y >= GF->Size)
+	if (!GameMode || !GameMode->GField)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: GameMode o GField null per cella %s"), *CellPos.ToString());
 		return false;
 	}
 
-	// Ottieni la tile
-	ATile* Tile = GF->GetTileMap()[CellPos];
-	if (!Tile)
-		return false;
-
-	// Se è la cella di partenza, consentila anche se "OCCUPIED" dalla stessa unità
-	if (bIsStart)
+	AGameField* GF = GameMode->GField;
+	if (!GF->TileMap.Contains(CellPos))
 	{
-		// Se c'è un'unità su questa tile...
+		UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s non trovata nella TileMap"), *CellPos.ToString());
+		return false;
+	}
+
+	
+		ATile* Tile = GF->TileMap[CellPos];
+		if (!Tile)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Tile a %s è NULL"), *CellPos.ToString());
+			return false;
+		}
+
+		if (bIsStart)
+		{
+			if (Tile->GetGameUnit() == this)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Cella di partenza %s valida: occupata dalla stessa unità (ID: %d)"), *CellPos.ToString(), this->GetGameUnitID());
+				return true;
+			}
+		}
+
+
+		// Controlla se la tile è un ostacolo
+		if (Tile->GetTileStatus() == ETileStatus::OBSTACLE)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s scartata -> OBSTACLE"), *CellPos.ToString());
+			return false;
+		}
+
+		// Se la tile è OCCUPIED...
 		if (Tile->GetTileStatus() == ETileStatus::OCCUPIED)
 		{
-			AGameUnit* Occupant = Tile->GetGameUnit();
-			// ... e NON è la stessa unità, blocca
-			if (Occupant != this)
+			if (bIsStart)
+			{
+				if (Tile->GetGameUnit() == this)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s (start) valida: occupata da me stesso"), *CellPos.ToString());
+					return true;
+				}
+	
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s scartata -> OCCUPIED"), *CellPos.ToString());
 				return false;
+			}
 		}
-		return true; // Ok, è la cella di partenza occupata da me stesso
+
+		// Se la tile è EMPTY, è valida
+		UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s valida: EMPTY"), *CellPos.ToString());
+		return true;
 	}
-	else
-	{
-		// Per le celle successive, devono essere strictly EMPTY
-		return (Tile->GetTileStatus() == ETileStatus::EMPTY);
-	}
-}
+
+
+
+
+
 
 
 

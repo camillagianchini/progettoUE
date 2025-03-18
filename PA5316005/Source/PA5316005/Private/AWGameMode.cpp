@@ -33,6 +33,7 @@ AAWGameMode::AAWGameMode()
     {
         UE_LOG(LogTemp, Error, TEXT("BP_GameField non trovato!"));
     }
+  
 
     // Stato iniziale del gioco
     bIsGameOver = false;
@@ -86,7 +87,9 @@ void AAWGameMode::CoinTossForStartingPlayer()
 {
     // Genera un numero casuale 0 o 1 per decidere chi inizia
     int32 CoinResult = FMath::RandRange(0, 1);
+    StartingPlayer = CoinResult; // salva in una variabile di AAWGameMode
     CurrentPlayer = CoinResult;
+    CurrentPlayer = StartingPlayer;
     UE_LOG(LogTemp, Log, TEXT("Coin toss result: %d. Starting player is: %d"), CoinResult, CurrentPlayer);
 
     // Avvia la fase di posizionamento
@@ -139,6 +142,8 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
                     if (SpawnedUnit)
                     {
                         bSniperPlaced.Add(1, true);
+                        SpawnedUnit->SetPlayerOwner(1);
+                        SpawnedUnit->SetGridPosition(Position.X, Position.Y);
                         // Aggiorna la tile: imposta lo stato a OCCUPIED e associa l'unità
          
                       
@@ -151,6 +156,9 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
                                 Tile->SetTileStatus(1, ETileStatus::OCCUPIED, SpawnedUnit);
                             }
                         }
+                        int32 NewUnitKey = GField->GameUnitMap.Num();
+                        GField->GameUnitMap.Add(NewUnitKey, SpawnedUnit);
+
                     }
                 }
                 else
@@ -166,7 +174,8 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
                     if (SpawnedUnit)
                     {
                         bBrawlerPlaced.Add(1, true);
-                       
+                        SpawnedUnit->SetPlayerOwner(1);
+                        SpawnedUnit->SetGridPosition(Position.X, Position.Y);
                         UE_LOG(LogTemp, Log, TEXT("AI ha piazzato un Brawler in %s"), *Position.ToString());
                         if (GField && GField->TileMap.Contains(Position))
                         {
@@ -176,12 +185,16 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
                                 Tile->SetTileStatus(1, ETileStatus::OCCUPIED, SpawnedUnit);
                             }
                         }
+                    int32 NewUnitKey = GField->GameUnitMap.Num();
+                    GField->GameUnitMap.Add(NewUnitKey, SpawnedUnit);
                     }
+
                 }
                 else
                 {
                     UE_LOG(LogTemp, Warning, TEXT("AIBrawlerClass non assegnato!"));
                 }
+
             }
 
         }
@@ -204,60 +217,68 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
         // Tutte le unità sono state posizionate: passa alla fase di battaglia
         CurrentPhase = EGamePhase::Battle;
         UE_LOG(LogTemp, Log, TEXT("Tutte le unità posizionate. Passaggio alla fase di battaglia."));
-       
+
+  
+
+        // Ora chiami NextTurn(), e se StartingPlayer == 1, parte l’AI
+        NextTurn();
     }
 
-    else
-    {
-        // Se non sono terminate, se il turno corrente è AI puoi chiamare nuovamente PlaceUnitForCurrentPlayer()
-        // oppure attendere l'input umano.
-        if (CurrentPlayer == 1)
-        {
-            PlaceUnitForCurrentPlayer();
-        }
-    }
-
-    NextTurn();
+   
 }
 
 
 void AAWGameMode::NextTurn()
 {
-   
+    UE_LOG(LogTemp, Warning, TEXT("NextTurn() - CurrentPlayer = %d"), CurrentPlayer);
 
     if (CurrentPhase == EGamePhase::Battle)
     {
-       
-
-        // Aggiorna eventualmente il messaggio del turno
-        UAWGameInstance* GI = Cast<UAWGameInstance>(GetGameInstance());
-        if (GI)
-        {
-            GI->SetTurnMessage((CurrentPlayer == 0) ? TEXT("Human Turn") : TEXT("AI Turn"));
-        }
-
-        // Se il giocatore attivo è l'AI, chiama OnTurn() dell'AI
+        // Se tocca all’AI
         if (CurrentPlayer == 1)
         {
-            // Assicurati che RandomPlayer sia tra i giocatori e chiama OnTurn()
             ARandomPlayer* AIPlayer = Cast<ARandomPlayer>(Players[1]);
             if (AIPlayer)
             {
+                // L'AI fa tutte le sue mosse, e SOLO dopo che ha finito TUTTE, chiama NextTurn()
                 AIPlayer->OnTurn();
             }
         }
-        // Se il giocatore attivo è l'umano, l'input (click) verrà gestito tramite OnClick()
+        else // Tocca all’umano
+        {
+            // Aspetta input dell’umano, NON chiamare NextTurn() finché l’umano non ha finito.
+            // L’umano, alla fine delle sue azioni (tutte le sue unità hanno agito), fa:
+            // GM->NextTurn();
+        }
     }
 }
 
 
+
+
 // Le seguenti funzioni sono stub da completare secondo la logica del tuo gioco
 
-bool AAWGameMode::TutteLeUnitaHannoAgito(int32 Player)
+bool AAWGameMode::TutteLeUnitaHannoAgito(int32 Player) const
 {
-    // Implementa il controllo se tutte le unità del giocatore "Player" hanno già agito in questo turno
+    if (!GField) return false;
+
+    // Cerca tutte le unità del giocatore 'Player'
+    for (auto& Pair : GField->GameUnitMap)
+    {
+        AGameUnit* Unit = Pair.Value;
+        if (Unit && Unit->GetPlayerOwner() == Player)
+        {
+            // Se trovi una unità che non ha agito, ritorna false
+            if (!Unit->bHasActed)
+            {
+                return false;
+            }
+        }
+    }
+    // Se arrivi qui, vuol dire che nessuna unità è rimasta con bHasActed == false
     return true;
 }
+
 
 bool AAWGameMode::CondizioniDiVittoria()
 {
@@ -267,8 +288,18 @@ bool AAWGameMode::CondizioniDiVittoria()
 
 void AAWGameMode::ResetActionsForPlayer(int32 Player)
 {
-    // Resetta lo stato delle unità del giocatore per permettere l'azione nel nuovo turno
+    if (!GField) return;
+
+    for (auto& Pair : GField->GameUnitMap)
+    {
+        AGameUnit* Unit = Pair.Value;
+        if (Unit && Unit->GetPlayerOwner() == Player)
+        {
+            Unit->bHasActed = false;
+        }
+    }
 }
+
 
 void AAWGameMode::EndGame()
 {

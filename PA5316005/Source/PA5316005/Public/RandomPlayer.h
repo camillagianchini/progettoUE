@@ -14,6 +14,8 @@ class PA5316005_API ARandomPlayer : public AActor, public IPlayerInterface
 public:
     virtual void OnTurn() override;
 
+    ARandomPlayer();
+
 private:
     void PerformRandomActionOnUnit(class AGameUnit* Unit);
 };

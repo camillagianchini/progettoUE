@@ -11,6 +11,7 @@ enum class ETileStatus : uint8
 {
 	EMPTY       UMETA(DisplayName = "Empty"),
 	OCCUPIED    UMETA(DisplayName = "Occupied"),
+	OBSTACLE    UMETA(DisplayName = "Obstacle")
 };
 
 UENUM()
@@ -63,6 +64,15 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
 	AGameUnit* GameUnit;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Obstacles")
+	UMaterialInterface* ObstacleMaterial1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Obstacles")
+	UMaterialInterface* ObstacleMaterial2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Obstacles")
+	UMaterialInterface* ObstacleMaterial3;
 
 public:
 

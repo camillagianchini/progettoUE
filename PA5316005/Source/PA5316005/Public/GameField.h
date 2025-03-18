@@ -80,6 +80,8 @@ public:
 
 	FVector2D GetSelectedTile() const;
 
+	void GenerateObstacles(float ObstaclePercentage);
+
 	TArray<FVector2D> GetLegalMoves();
 
 	FVector GetRelativePositionByXYPosition(const int32 InX, const int32 InY) const;
@@ -108,8 +110,6 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ResetField();
 
-	UFUNCTION(BlueprintCallable, Category = "Game Field")
-	TArray<FVector2D> GetValidMoves(class AGameUnit* Unit) const;
 
 
 	UFUNCTION(BlueprintCallable, Category = "Game Field")

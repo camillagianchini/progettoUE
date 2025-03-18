@@ -6,11 +6,17 @@
 #include "GameUnit.h"
 #include "EngineUtils.h"
 
+ARandomPlayer::ARandomPlayer()
+{
+    // Se vuoi differenziare PlayerNumber da 0 (umano)
+    PlayerNumber = 1;
+}
+
+
 void ARandomPlayer::OnTurn()
 {
-    UE_LOG(LogTemp, Log, TEXT("ARandomPlayer::OnTurn() - Inizio turno AI"));
+    UE_LOG(LogTemp, Warning, TEXT("ARandomPlayer::OnTurn() - Inizio turno AI"));
 
-    // Ottieni il riferimento al GameMode
     AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
     if (!GM || !GM->GField)
     {
@@ -19,40 +25,43 @@ void ARandomPlayer::OnTurn()
     }
 
     // Filtra le unità AI (PlayerOwner == 1)
-    TArray<AGameUnit*> AIUnits;
-    for (auto& Pair : GM->GField->GameUnitMap)
-    {
-        AGameUnit* Unit = Pair.Value;
-        if (Unit && Unit->GetPlayerOwner() == 1)
-        {
-            AIUnits.Add(Unit);
-        }
-    }
+    TArray<AGameUnit*> AIUnits = TrovaLeMieUnita(GM);
+
+    // Se non ho unità, passo subito il turno
     if (AIUnits.Num() == 0)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Nessuna unità AI disponibile."));
-        // Nessuna unità AI? Termina subito
         GM->NextTurn();
         return;
     }
 
-    // Esegui un'azione per ciascuna unità dell'AI (es. 2 unità: Sniper e Brawler)
+    // Esegui le mosse AI (in un colpo solo o una per una). 
+    // Ad esempio:
     for (AGameUnit* Unit : AIUnits)
     {
-        // Esegui la funzione che sceglie random se muovere e attaccare, ecc.
-        PerformRandomActionOnUnit(Unit);
+        if (!Unit->bHasActed)
+        {
+            // Fai random move + attacco
+            PerformRandomActionOnUnit(Unit);
+        }
     }
 
-    // Al termine delle azioni di tutte le unità, passa il turno
-    UE_LOG(LogTemp, Log, TEXT("ARandomPlayer::OnTurn() - Fine turno AI"));
+    // A fine di TUTTE le azioni, passo il turno
     GM->NextTurn();
 }
+
 
 void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
 {
     if (!Unit)
     {
         UE_LOG(LogTemp, Warning, TEXT("PerformRandomActionOnUnit: unità nulla."));
+        return;
+    }
+
+    // Se l'unità ha già agito, non eseguire nessuna azione
+    if (Unit->bHasActed)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Unità ID %d ha già agito."), Unit->GetGameUnitID());
         return;
     }
 
@@ -63,7 +72,7 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
         return;
     }
 
-    // 1. Calcola le mosse legali di movimento
+    // 1. Calcola le mosse legali per il movimento
     TArray<FVector2D> Moves = Unit->CalculateLegalMoves();
     TArray<FVector2D> ValidMoves;
     for (const FVector2D& MovePos : Moves)
@@ -77,7 +86,7 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
             }
         }
     }
-    bool bCanMove = ValidMoves.Num() > 0;
+    bool bCanMove = (ValidMoves.Num() > 0);
 
     // 2. Calcola le mosse di attacco
     TArray<FVector2D> Attacks = Unit->CalculateAttackMoves();
@@ -87,7 +96,7 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
         if (GM->GField->IsValidPosition(AttackPos))
         {
             ATile* Tile = GM->GField->GetTileMap()[AttackPos];
-            // Se c'è un'unità nemica (PlayerOwner == 0)
+            // Se c'è un'unità nemica (assumendo che le unità nemiche abbiano PlayerOwner == 0)
             if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
             {
                 AGameUnit* Target = Tile->GetGameUnit();
@@ -98,42 +107,34 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
             }
         }
     }
-    bool bCanAttack = ValidAttacks.Num() > 0;
+    bool bCanAttack = (ValidAttacks.Num() > 0);
 
-    // Se non può fare nulla
+    // Se l'unità non può né muoversi né attaccare, esci
     if (!bCanMove && !bCanAttack)
     {
         UE_LOG(LogTemp, Warning, TEXT("Unità ID %d non può né muoversi né attaccare."), Unit->GetGameUnitID());
         return;
     }
 
-    // 3. Prepara un array di opzioni
-    TArray<int32> Options; // 0 = Muovi+Attacca, 1 = SoloAttacca, 2 = SoloMuovi
+    // 3. Prepara le opzioni
+    TArray<int32> Options; // 0 = Muovi+Attacca, 1 = Solo Attacca, 2 = Solo Muovi
     if (bCanMove && bCanAttack)
-    {
-        Options.Add(0); // Muovi e poi attacca
-    }
+        Options.Add(0);
     if (bCanAttack)
-    {
-        Options.Add(1); // Solo attacca
-    }
+        Options.Add(1);
     if (bCanMove)
-    {
-        Options.Add(2); // Solo muovi
-    }
+        Options.Add(2);
 
-    // Scegli una delle opzioni
     int32 ActionChoice = Options[FMath::RandRange(0, Options.Num() - 1)];
     switch (ActionChoice)
     {
-    case 0: // Muovi e poi attacca
+    case 0:
     {
         UE_LOG(LogTemp, Log, TEXT("AI: Unità ID %d -> Muovi e poi Attacca"), Unit->GetGameUnitID());
-        // Scegli un move
         FVector2D MovePos = ValidMoves[FMath::RandRange(0, ValidMoves.Num() - 1)];
         GM->GField->MoveUnit(Unit, MovePos);
 
-        // Ricalcola le mosse di attacco dopo il movimento
+        // (Opzionale) Aspetta o aggiorna la posizione, poi ricalcola le mosse di attacco
         Attacks = Unit->CalculateAttackMoves();
         ValidAttacks.Empty();
         for (const FVector2D& AttackPos : Attacks)
@@ -158,14 +159,14 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
         }
     }
     break;
-    case 1: // Solo Attacca
+    case 1:
     {
         UE_LOG(LogTemp, Log, TEXT("AI: Unità ID %d -> Solo Attacca"), Unit->GetGameUnitID());
         FVector2D AttackPos = ValidAttacks[FMath::RandRange(0, ValidAttacks.Num() - 1)];
         GM->GField->AttackUnit(Unit, AttackPos);
     }
     break;
-    case 2: // Solo Muovi
+    case 2:
     {
         UE_LOG(LogTemp, Log, TEXT("AI: Unità ID %d -> Solo Muovi"), Unit->GetGameUnitID());
         FVector2D MovePos = ValidMoves[FMath::RandRange(0, ValidMoves.Num() - 1)];
@@ -173,7 +174,10 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
     }
     break;
     }
+
+    // Segna che questa unità ha già agito per questo turno
+    Unit->bHasActed = true;
+
+    UE_LOG(LogTemp, Log, TEXT("ARandomPlayer::OnTurn() - Fine turno AI"));
+    GM->NextTurn();
 }
-
-
-

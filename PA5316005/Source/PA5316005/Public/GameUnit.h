@@ -27,6 +27,9 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+	// In AGameUnit.h, sotto le altre proprietà
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Unit")
+	bool bHasActed;
 
 protected:
 	// Called when the game starts or when spawned
@@ -57,6 +60,9 @@ protected:
 	// Type indicates (SNIPER or BRAWLER)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	EGameUnitType GameUnitType;
+
+	
+
 
 	// Health Points of the unit
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -110,7 +116,7 @@ public:
 	// Set the unit's Damage values (min and max)
 	void SetDamage(int32 NewDamageMin, int32 NewDamageMax);
 
-	bool IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const;
+	bool IsValidGridCell(const FVector2D& Pos, bool bIsStart) const;
 
 	// ************ GETTERS ************
 	// Get the unique GameUnit ID

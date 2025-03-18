@@ -15,6 +15,7 @@ ASniper::ASniper()
 void ASniper::BeginPlay()
 {
 	Super::BeginPlay();
+	MovementRange = 3;
 
 	// Assegna un ID univoco all'unità
 	SetGameUnitID();
