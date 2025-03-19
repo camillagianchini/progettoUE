@@ -10,7 +10,8 @@ int32 AGameUnit::NewGameUnitID = 0;
 AGameUnit::AGameUnit()
 {
 	PrimaryActorTick.bCanEverTick = true;
-
+	bHasMoved = false;
+	bHasAttacked = false;
 	// Creazione dei componenti base
 	Scene = CreateDefaultSubobject<USceneComponent>(TEXT("Scene"));
 	StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMeshComponent"));
@@ -20,7 +21,6 @@ AGameUnit::AGameUnit()
 	StaticMeshComponent->SetupAttachment(Scene);
 
 	// Inizializza le proprietà della GameUnit
-	bHasActed = false;
 	GameUnitGridPosition = FVector2D(-1, -1);
 	PlayerOwner = -1;
 	GameUnitID = -100;
@@ -31,6 +31,7 @@ AGameUnit::AGameUnit()
 	DamageMax = 0;
 	GameUnitType = EGameUnitType::SNIPER; // Valore di default; può essere modificato tramite setter
 	GameMode = nullptr;
+	
 }
 
 // Called every frame
@@ -146,8 +147,8 @@ TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 	
 	FVector2D StartPos = GetGridPosition();
 
-	UE_LOG(LogTemp, Warning, TEXT("CalculateLegalMoves chiamato per unità ID=%d, StartPos=(%.0f, %.0f), MovementRange=%d"),
-		GetGameUnitID(), StartPos.X, StartPos.Y, MovementRange);
+	//UE_LOG(LogTemp, Warning, TEXT("CalculateLegalMoves chiamato per unità ID=%d, StartPos=(%.0f, %.0f), MovementRange=%d"),
+		//tGameUnitID(), StartPos.X, StartPos.Y, MovementRange);
 
 
 	// Strutture BFS
@@ -171,8 +172,8 @@ TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 	{
 		FVector2D Current;
 		Frontier.Dequeue(Current);
-		UE_LOG(LogTemp, Warning, TEXT("BFS Current = (%.0f, %.0f), Dist = %d"),
-			Current.X, Current.Y, DistMap[Current]);
+		//UE_LOG(LogTemp, Warning, TEXT("BFS Current = (%.0f, %.0f), Dist = %d"),
+			//Current.X, Current.Y, DistMap[Current]);
 		int32 CurrentDist = DistMap[Current];
 
 		// Espandi nei 4 vicini
@@ -206,8 +207,8 @@ TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 
 bool AGameUnit::IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const
 {
-	UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell(%.0f, %.0f), bIsStart=%s"),
-		CellPos.X, CellPos.Y, bIsStart ? TEXT("true") : TEXT("false"));
+	//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell(%.0f, %.0f), bIsStart=%s"),
+		//CellPos.X, CellPos.Y, bIsStart ? TEXT("true") : TEXT("false"));
 
 	if (!GameMode || !GameMode->GField)
 	{
@@ -226,7 +227,7 @@ bool AGameUnit::IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const
 		ATile* Tile = GF->TileMap[CellPos];
 		if (!Tile)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Tile a %s è NULL"), *CellPos.ToString());
+			//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Tile a %s è NULL"), *CellPos.ToString());
 			return false;
 		}
 
@@ -243,7 +244,7 @@ bool AGameUnit::IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const
 		// Controlla se la tile è un ostacolo
 		if (Tile->GetTileStatus() == ETileStatus::OBSTACLE)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s scartata -> OBSTACLE"), *CellPos.ToString());
+			//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s scartata -> OBSTACLE"), *CellPos.ToString());
 			return false;
 		}
 
@@ -254,24 +255,109 @@ bool AGameUnit::IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const
 			{
 				if (Tile->GetGameUnit() == this)
 				{
-					UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s (start) valida: occupata da me stesso"), *CellPos.ToString());
+					//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s (start) valida: occupata da me stesso"), *CellPos.ToString());
 					return true;
 				}
 	
 			}
 			else
 			{
-				UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s scartata -> OCCUPIED"), *CellPos.ToString());
+				//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s scartata -> OCCUPIED"), *CellPos.ToString());
 				return false;
 			}
 		}
 
 		// Se la tile è EMPTY, è valida
-		UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s valida: EMPTY"), *CellPos.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s valida: EMPTY"), *CellPos.ToString());
 		return true;
 	}
 
 
+TArray<FVector2D> AGameUnit::CalculatePath(const FVector2D& EndPos)
+{
+	TArray<FVector2D> Path;
+
+	// 1) Recupera il riferimento al GameField
+	//    (assumendo di avere GameMode->GField disponibile)
+	if (!GameMode || !GameMode->GField)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CalculatePath: GameField non valido."));
+		return Path;
+	}
+
+	FVector2D StartPos = GetGridPosition();
+	if (StartPos == EndPos)
+	{
+		// Se già stai sulla cella di destinazione, path vuoto
+		return Path;
+	}
+
+	// 2) Strutture BFS
+	TQueue<FVector2D> Frontier;
+	TSet<FVector2D> Visited;
+	TMap<FVector2D, FVector2D> CameFrom;
+
+	Frontier.Enqueue(StartPos);
+	Visited.Add(StartPos);
+	CameFrom.Add(StartPos, StartPos);
+
+	// 3) Direzioni (4 direzioni ortogonali)
+	TArray<FVector2D> Directions;
+	Directions.Add(FVector2D(1, 0));
+	Directions.Add(FVector2D(-1, 0));
+	Directions.Add(FVector2D(0, 1));
+	Directions.Add(FVector2D(0, -1));
+
+	// 4) BFS loop
+	bool bFound = false;
+	while (!Frontier.IsEmpty())
+	{
+		FVector2D Current;
+		Frontier.Dequeue(Current);
+
+		// Se abbiamo trovato EndPos, interrompiamo
+		if (Current == EndPos)
+		{
+			bFound = true;
+			break;
+		}
+
+		// Espandi i vicini
+		for (auto& Dir : Directions)
+		{
+			FVector2D Neighbor = Current + Dir;
+
+			bool bIsStartCell = (Neighbor == StartPos);
+			if (!Visited.Contains(Neighbor) && IsValidGridCell(Neighbor, bIsStartCell))
+			{
+				Frontier.Enqueue(Neighbor);
+				Visited.Add(Neighbor);
+				CameFrom.Add(Neighbor, Current);
+			}
+		}
+	}
+
+	if (!bFound)
+	{
+		// Nessun path trovato
+		return Path;
+	}
+
+	// 5) Ricostruisci il percorso facendo backtracking da EndPos
+	FVector2D Tracer = EndPos;
+	while (Tracer != StartPos)
+	{
+		Path.Add(Tracer);
+		Tracer = CameFrom[Tracer];
+	}
+	// (opzionale) Aggiungi la cella di partenza se vuoi
+	// Path.Add(StartPos);
+
+	// Il path ora è al contrario (da EndPos a StartPos), quindi lo inverti
+	Algo::Reverse(Path);
+
+	return Path;
+}
 
 
 
@@ -281,17 +367,73 @@ bool AGameUnit::IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const
 
 TArray<FVector2D> AGameUnit::CalculateAttackMoves() const
 {
-	TArray<FVector2D> AttackMoves;
-	// Utilizza AttackRange per calcolare le posizioni di attacco
-	for (int32 Offset = 1; Offset <= AttackRange; Offset++)
+	TArray<FVector2D> AttackableCells;
+	if (!GameMode || !GameMode->GField)
 	{
-		AttackMoves.Add(FVector2D(GameUnitGridPosition.X + Offset, GameUnitGridPosition.Y));
-		AttackMoves.Add(FVector2D(GameUnitGridPosition.X - Offset, GameUnitGridPosition.Y));
-		AttackMoves.Add(FVector2D(GameUnitGridPosition.X, GameUnitGridPosition.Y + Offset));
-		AttackMoves.Add(FVector2D(GameUnitGridPosition.X, GameUnitGridPosition.Y - Offset));
+		return AttackableCells;
 	}
-	return AttackMoves;
+
+	AGameField* GF = GameMode->GField;
+	FVector2D MyPos = GetGridPosition();
+
+	if (GameUnitType == EGameUnitType::BRAWLER)
+	{
+		// Per il Brawler, l'attacco a corto raggio: considera le celle adiacenti (su, giù, sinistra, destra)
+		static const TArray<FVector2D> Directions = {
+			FVector2D(1, 0), FVector2D(-1, 0),
+			FVector2D(0, 1), FVector2D(0, -1)
+		};
+		for (const FVector2D& Dir : Directions)
+		{
+			FVector2D Candidate = MyPos + Dir;
+			if (GF->IsValidPosition(Candidate) && GF->TileMap.Contains(Candidate))
+			{
+				ATile* Tile = GF->TileMap[Candidate];
+				if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
+				{
+					AGameUnit* OtherUnit = Tile->GetGameUnit();
+					if (OtherUnit && OtherUnit->GetPlayerOwner() != this->GetPlayerOwner())
+					{
+						AttackableCells.Add(Candidate);
+					}
+				}
+			}
+		}
+	}
+	else // SNIPER
+	{
+		// Per lo Sniper, ignora gli ostacoli: utilizza la distanza di Manhattan.
+		// Itera solo sulle celle entro la dimensione della griglia.
+		for (int32 x = 0; x < GameMode->FieldSize; x++)
+		{
+			for (int32 y = 0; y < GameMode->FieldSize; y++)
+			{
+				FVector2D Candidate(x, y);
+				// Calcola la distanza di Manhattan
+				int32 ManhattanDist = FMath::Abs(Candidate.X - MyPos.X) + FMath::Abs(Candidate.Y - MyPos.Y);
+				if (ManhattanDist > 0 && ManhattanDist <= AttackRange)
+				{
+					if (GF->TileMap.Contains(Candidate))
+					{
+						ATile* Tile = GF->TileMap[Candidate];
+						if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
+						{
+							AGameUnit* OtherUnit = Tile->GetGameUnit();
+							if (OtherUnit && OtherUnit->GetPlayerOwner() != this->GetPlayerOwner())
+							{
+								AttackableCells.Add(Candidate);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return AttackableCells;
 }
+
+
 
 
 void AGameUnit::TakeDamageUnit(int32 DamageAmount)

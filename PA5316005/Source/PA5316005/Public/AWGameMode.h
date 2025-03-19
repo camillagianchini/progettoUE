@@ -31,12 +31,12 @@ public:
 
     // Funzioni per la fase di posizionamento
     void CoinTossForStartingPlayer();
-    void ChoosePlayerAndStartGame();
+    //void ChoosePlayerAndStartGame();
     void PlaceUnitForCurrentPlayer();
 
     // Funzioni per la fase di battaglia
     void NextTurn();
-    bool TutteLeUnitaHannoAgito(int32 Player) const;
+    bool AllUnitsHaveActed(int32 Player);
     bool CondizioniDiVittoria();
     void ResetActionsForPlayer(int32 Player);
     void EndGame();
@@ -69,6 +69,8 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Turn Management")
     int32 StartingPlayer;
+
+    
 
     // Dimensione del campo (griglia NxN)
     UPROPERTY(EditAnywhere, BlueprintReadOnly)

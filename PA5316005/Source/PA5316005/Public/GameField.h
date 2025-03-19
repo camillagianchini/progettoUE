@@ -101,6 +101,8 @@ public:
 
 	void ResetGameStatusField();
 
+
+
 	TArray<FVector2D> LegalMoves(FVector2D Position) const;
 
 	TArray<FVector2D> PossibleMoves(FVector2D Position) const;
@@ -110,7 +112,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ResetField();
 
-
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void ShowLegalMovesForUnit(AGameUnit* Unit);
 
 	UFUNCTION(BlueprintCallable, Category = "Game Field")
 	void MoveUnit(AGameUnit* Unit, const FVector2D& NewPos);

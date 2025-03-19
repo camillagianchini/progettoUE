@@ -29,7 +29,7 @@ void AAWPlayerController::BeginPlay()
     if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
     {
         Subsystem->AddMappingContext(AWContext, 0);
-        UE_LOG(LogTemp, Log, TEXT("Added Mapping Context: %s"), AWContext ? *AWContext->GetName() : TEXT("None"));
+    
     }
     else
     {
@@ -53,13 +53,13 @@ void AAWPlayerController::SetupInputComponent()
     }
     else
     {
-        UE_LOG(LogTemp, Log, TEXT("ClickAction assegnato: %s"), *ClickAction->GetName());
+        //UE_LOG(LogTemp, Log, TEXT("ClickAction assegnato: %s"), *ClickAction->GetName());
     }
 
     if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(InputComponent))
     {
         EnhancedInputComponent->BindAction(ClickAction, ETriggerEvent::Triggered, this, &AAWPlayerController::ClickOnGrid);
-        UE_LOG(LogTemp, Log, TEXT("BindAction completato per ClickAction."));
+        //UE_LOG(LogTemp, Log, TEXT("BindAction completato per ClickAction."));
     }
 }
 
@@ -67,15 +67,15 @@ void AAWPlayerController::SetupInputComponent()
 
 void AAWPlayerController::ClickOnGrid()
 {
-    UE_LOG(LogTemp, Warning, TEXT("ClickOnGrid() triggered!"));
+    //UE_LOG(LogTemp, Warning, TEXT("ClickOnGrid() triggered!"));
     if (AHumanPlayer* HumanPlayer = Cast<AHumanPlayer>(GetPawn()))
     {
-        UE_LOG(LogTemp, Warning, TEXT("Trovato HumanPlayer!"));
+        //UE_LOG(LogTemp, Warning, TEXT("Trovato HumanPlayer!"));
         HumanPlayer->OnClick();
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("Il Pawn posseduto non è un HumanPlayer."));
+        //UE_LOG(LogTemp, Warning, TEXT("Il Pawn posseduto non è un HumanPlayer."));
     }
 }
 

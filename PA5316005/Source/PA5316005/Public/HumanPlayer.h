@@ -51,9 +51,12 @@ public:
 	UFUNCTION(BlueprintCallable)
 	FVector2D GetClickedTilePosition() const;
 
+	// Aggiungi la dichiarazione della funzione
+	UFUNCTION(BlueprintCallable, Category = "Player")
+	void DoNextUnitAction();
 
-	UFUNCTION(BlueprintCallable, Category = "Input")
-	void ShowLegalMovesForUnit(AGameUnit* Unit);
+
+	
 };
 
 

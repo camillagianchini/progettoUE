@@ -89,18 +89,17 @@ void AAWGameMode::CoinTossForStartingPlayer()
     int32 CoinResult = FMath::RandRange(0, 1);
     StartingPlayer = CoinResult; // salva in una variabile di AAWGameMode
     CurrentPlayer = CoinResult;
-    CurrentPlayer = StartingPlayer;
     UE_LOG(LogTemp, Log, TEXT("Coin toss result: %d. Starting player is: %d"), CoinResult, CurrentPlayer);
 
     // Avvia la fase di posizionamento
-    ChoosePlayerAndStartGame();
-}
-
-void AAWGameMode::ChoosePlayerAndStartGame()
-{
-    // Inizia la fase di posizionamento chiamando PlaceUnitForCurrentPlayer()
     PlaceUnitForCurrentPlayer();
 }
+
+//void AAWGameMode::ChoosePlayerAndStartGame()
+//{
+    // Inizia la fase di posizionamento chiamando PlaceUnitForCurrentPlayer()
+   // PlaceUnitForCurrentPlayer();
+//}
 
 void AAWGameMode::PlaceUnitForCurrentPlayer()
 {
@@ -217,7 +216,7 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
         // Tutte le unità sono state posizionate: passa alla fase di battaglia
         CurrentPhase = EGamePhase::Battle;
         UE_LOG(LogTemp, Log, TEXT("Tutte le unità posizionate. Passaggio alla fase di battaglia."));
-
+        
   
 
         // Ora chiami NextTurn(), e se StartingPlayer == 1, parte l’AI
@@ -230,54 +229,43 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
 
 void AAWGameMode::NextTurn()
 {
-    UE_LOG(LogTemp, Warning, TEXT("NextTurn() - CurrentPlayer = %d"), CurrentPlayer);
+    CurrentPlayer = 1 - CurrentPlayer;
 
-    if (CurrentPhase == EGamePhase::Battle)
+    // Resetto le azioni per il nuovo player
+    ResetActionsForPlayer(CurrentPlayer);
+
+    // Log di debug
+    UE_LOG(LogTemp, Warning, TEXT("NextTurn() -> adesso CurrentPlayer = %d"), CurrentPlayer);
+
+    // Se AI => AI.OnTurn(), altrimenti umano
+    if (CurrentPlayer == 1)
     {
-        // Se tocca all’AI
-        if (CurrentPlayer == 1)
-        {
-            ARandomPlayer* AIPlayer = Cast<ARandomPlayer>(Players[1]);
-            if (AIPlayer)
-            {
-                // L'AI fa tutte le sue mosse, e SOLO dopo che ha finito TUTTE, chiama NextTurn()
-                AIPlayer->OnTurn();
-            }
-        }
-        else // Tocca all’umano
-        {
-            // Aspetta input dell’umano, NON chiamare NextTurn() finché l’umano non ha finito.
-            // L’umano, alla fine delle sue azioni (tutte le sue unità hanno agito), fa:
-            // GM->NextTurn();
-        }
+        ARandomPlayer* AI = Cast<ARandomPlayer>(Players[1]);
+        if (AI)
+            AI->OnTurn();
     }
 }
 
 
-
-
-// Le seguenti funzioni sono stub da completare secondo la logica del tuo gioco
-
-bool AAWGameMode::TutteLeUnitaHannoAgito(int32 Player) const
+bool AAWGameMode::AllUnitsHaveActed(int32 Player)
 {
-    if (!GField) return false;
-
-    // Cerca tutte le unità del giocatore 'Player'
     for (auto& Pair : GField->GameUnitMap)
     {
         AGameUnit* Unit = Pair.Value;
-        if (Unit && Unit->GetPlayerOwner() == Player)
+        // L'unità ha terminato il turno se ha sia mosso che attaccato
+        if (Unit && Unit->GetPlayerOwner() == Player && !(Unit->bHasMoved && Unit->bHasAttacked))
         {
-            // Se trovi una unità che non ha agito, ritorna false
-            if (!Unit->bHasActed)
-            {
-                return false;
-            }
+            return false;
         }
     }
-    // Se arrivi qui, vuol dire che nessuna unità è rimasta con bHasActed == false
     return true;
 }
+
+
+
+
+
+
 
 
 bool AAWGameMode::CondizioniDiVittoria()
@@ -288,24 +276,21 @@ bool AAWGameMode::CondizioniDiVittoria()
 
 void AAWGameMode::ResetActionsForPlayer(int32 Player)
 {
-    if (!GField) return;
-
     for (auto& Pair : GField->GameUnitMap)
     {
         AGameUnit* Unit = Pair.Value;
         if (Unit && Unit->GetPlayerOwner() == Player)
         {
-            Unit->bHasActed = false;
+            Unit->bHasMoved = false;
+            Unit->bHasAttacked = false;
         }
     }
 }
 
 
-void AAWGameMode::EndGame()
-{
-    bIsGameOver = true;
-    UE_LOG(LogTemp, Log, TEXT("Gioco terminato!"));
-}
+
+
+
 
 
 bool AAWGameMode::DoMove(FVector2D Destination, bool bTestOnly)

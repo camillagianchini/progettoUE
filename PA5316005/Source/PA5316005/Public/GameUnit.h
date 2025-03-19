@@ -27,10 +27,6 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	// In AGameUnit.h, sotto le altre proprietà
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Unit")
-	bool bHasActed;
-
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -122,6 +118,9 @@ public:
 	// Get the unique GameUnit ID
 	int32 GetGameUnitID() const;
 
+
+	TArray<FVector2D> CalculatePath(const FVector2D& EndPos);
+
 	// Get the Player Owner
 	int32 GetPlayerOwner() const;
 
@@ -161,6 +160,10 @@ public:
 
 	// Returns true if the unit is dead (HitPoints <= 0)
 	bool IsDead() const;
+
+	// Nell'header di AGameUnit aggiungi:
+	bool bHasMoved;
+	bool bHasAttacked;
 };
 
 

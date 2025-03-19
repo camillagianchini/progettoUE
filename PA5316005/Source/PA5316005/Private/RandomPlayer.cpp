@@ -1,5 +1,3 @@
-// RandomPlayer.cpp
-
 #include "RandomPlayer.h"
 #include "AWGameMode.h"
 #include "GameField.h"
@@ -8,60 +6,100 @@
 
 ARandomPlayer::ARandomPlayer()
 {
-    // Se vuoi differenziare PlayerNumber da 0 (umano)
+    // Differenzia il PlayerNumber dall'umano (0)
     PlayerNumber = 1;
+    SequenceIndex = 0;
 }
-
 
 void ARandomPlayer::OnTurn()
 {
-    UE_LOG(LogTemp, Warning, TEXT("ARandomPlayer::OnTurn() - Inizio turno AI"));
-
-    AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
-    if (!GM || !GM->GField)
+    if (!GetWorld())
     {
-        UE_LOG(LogTemp, Error, TEXT("AI OnTurn: GameMode o GameField non trovato"));
+        UE_LOG(LogTemp, Error, TEXT("ARandomPlayer::OnTurn() - GetWorld() è nullptr!"));
         return;
     }
 
-    // Filtra le unità AI (PlayerOwner == 1)
-    TArray<AGameUnit*> AIUnits = TrovaLeMieUnita(GM);
+    AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+    if (!GM)
+    {
+        UE_LOG(LogTemp, Error, TEXT("ARandomPlayer::OnTurn() - GetAuthGameMode() è nullptr!"));
+        return;
+    }
 
-    // Se non ho unità, passo subito il turno
+    if (!GM->GField)
+    {
+        UE_LOG(LogTemp, Error, TEXT("ARandomPlayer::OnTurn() - GField è nullptr!"));
+        return;
+    }
+
+    // Filtra le unità AI che non hanno completato (non hanno ancora effettuato movimento e attacco)
+    TArray<AGameUnit*> AIUnits;
+    for (auto& Pair : GM->GField->GameUnitMap)
+    {
+        AGameUnit* Unit = Pair.Value;
+        // Se almeno una delle azioni non è stata eseguita, includi la unità
+        if (Unit && Unit->GetPlayerOwner() == 1 && !(Unit->bHasMoved && Unit->bHasAttacked))
+        {
+            AIUnits.Add(Unit);
+        }
+    }
+
     if (AIUnits.Num() == 0)
     {
+        // Se tutte le unità hanno completato, passa il turno
         GM->NextTurn();
         return;
     }
 
-    // Esegui le mosse AI (in un colpo solo o una per una). 
-    // Ad esempio:
-    for (AGameUnit* Unit : AIUnits)
-    {
-        if (!Unit->bHasActed)
-        {
-            // Fai random move + attacco
-            PerformRandomActionOnUnit(Unit);
-        }
-    }
-
-    // A fine di TUTTE le azioni, passo il turno
-    GM->NextTurn();
+    SequenceIndex = 0;
+    UnitsSequence = AIUnits;
+    DoNextUnitAction();
 }
 
+void ARandomPlayer::DoNextUnitAction()
+{
+    if (SequenceIndex >= UnitsSequence.Num())
+    {
+        UE_LOG(LogTemp, Log, TEXT("AI: Tutte le unità hanno completato le azioni. Passo il turno."));
+        AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+        if (GM)
+            GM->NextTurn();
+        return;
+    }
+
+    AGameUnit* CurrentUnit = UnitsSequence[SequenceIndex];
+    if (!CurrentUnit)
+    {
+        SequenceIndex++;
+        DoNextUnitAction();
+        return;
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("Chiamato ShowLegalMovesForUnit per unità ID=%d"), CurrentUnit->GetGameUnitID());
+    AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+    if (GM && GM->GField)
+    {
+        GM->GField->ShowLegalMovesForUnit(CurrentUnit);
+    }
+
+    // Attendi 2 secondi (per mostrare l'evidenziazione) e poi esegui l'azione
+    FTimerHandle TimerHandle;
+    GetWorldTimerManager().SetTimer(TimerHandle, [this, CurrentUnit]()
+        {
+            PerformRandomActionOnUnit(CurrentUnit);
+            // Indipendentemente dall'azione eseguita, segnala che la unità ha "completato" il turno
+            CurrentUnit->bHasMoved = true;
+            CurrentUnit->bHasAttacked = true;
+            SequenceIndex++;
+            DoNextUnitAction();
+        }, 2.0f, false);
+}
 
 void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
 {
     if (!Unit)
     {
         UE_LOG(LogTemp, Warning, TEXT("PerformRandomActionOnUnit: unità nulla."));
-        return;
-    }
-
-    // Se l'unità ha già agito, non eseguire nessuna azione
-    if (Unit->bHasActed)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Unità ID %d ha già agito."), Unit->GetGameUnitID());
         return;
     }
 
@@ -72,7 +110,7 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
         return;
     }
 
-    // 1. Calcola le mosse legali per il movimento
+    // Calcola le possibili mosse per il movimento
     TArray<FVector2D> Moves = Unit->CalculateLegalMoves();
     TArray<FVector2D> ValidMoves;
     for (const FVector2D& MovePos : Moves)
@@ -88,7 +126,7 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
     }
     bool bCanMove = (ValidMoves.Num() > 0);
 
-    // 2. Calcola le mosse di attacco
+    // Calcola le possibili mosse di attacco
     TArray<FVector2D> Attacks = Unit->CalculateAttackMoves();
     TArray<FVector2D> ValidAttacks;
     for (const FVector2D& AttackPos : Attacks)
@@ -96,7 +134,7 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
         if (GM->GField->IsValidPosition(AttackPos))
         {
             ATile* Tile = GM->GField->GetTileMap()[AttackPos];
-            // Se c'è un'unità nemica (assumendo che le unità nemiche abbiano PlayerOwner == 0)
+            // Supponiamo che le unità nemiche abbiano PlayerOwner == 0
             if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
             {
                 AGameUnit* Target = Tile->GetGameUnit();
@@ -109,32 +147,14 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
     }
     bool bCanAttack = (ValidAttacks.Num() > 0);
 
-    // Se l'unità non può né muoversi né attaccare, esci
-    if (!bCanMove && !bCanAttack)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Unità ID %d non può né muoversi né attaccare."), Unit->GetGameUnitID());
-        return;
-    }
-
-    // 3. Prepara le opzioni
-    TArray<int32> Options; // 0 = Muovi+Attacca, 1 = Solo Attacca, 2 = Solo Muovi
+    // Se entrambe le azioni sono possibili, esegui "Muovi e poi Attacca"
     if (bCanMove && bCanAttack)
-        Options.Add(0);
-    if (bCanAttack)
-        Options.Add(1);
-    if (bCanMove)
-        Options.Add(2);
-
-    int32 ActionChoice = Options[FMath::RandRange(0, Options.Num() - 1)];
-    switch (ActionChoice)
-    {
-    case 0:
     {
         UE_LOG(LogTemp, Log, TEXT("AI: Unità ID %d -> Muovi e poi Attacca"), Unit->GetGameUnitID());
         FVector2D MovePos = ValidMoves[FMath::RandRange(0, ValidMoves.Num() - 1)];
         GM->GField->MoveUnit(Unit, MovePos);
 
-        // (Opzionale) Aspetta o aggiorna la posizione, poi ricalcola le mosse di attacco
+        // Dopo il movimento, ricalcola le possibili mosse di attacco
         Attacks = Unit->CalculateAttackMoves();
         ValidAttacks.Empty();
         for (const FVector2D& AttackPos : Attacks)
@@ -157,27 +177,32 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
             FVector2D AttackPos = ValidAttacks[FMath::RandRange(0, ValidAttacks.Num() - 1)];
             GM->GField->AttackUnit(Unit, AttackPos);
         }
+        else
+        {
+            UE_LOG(LogTemp, Log, TEXT("AI: Unità ID %d -> Nessun bersaglio disponibile dopo il movimento"), Unit->GetGameUnitID());
+        }
     }
-    break;
-    case 1:
+    // Se solo attaccare è possibile, esegui "Solo Attacca"
+    else if (bCanAttack)
     {
         UE_LOG(LogTemp, Log, TEXT("AI: Unità ID %d -> Solo Attacca"), Unit->GetGameUnitID());
         FVector2D AttackPos = ValidAttacks[FMath::RandRange(0, ValidAttacks.Num() - 1)];
         GM->GField->AttackUnit(Unit, AttackPos);
     }
-    break;
-    case 2:
+    // Altrimenti, se solo muovere è possibile, esegui "Solo Muovi"
+    else if (bCanMove)
     {
         UE_LOG(LogTemp, Log, TEXT("AI: Unità ID %d -> Solo Muovi"), Unit->GetGameUnitID());
         FVector2D MovePos = ValidMoves[FMath::RandRange(0, ValidMoves.Num() - 1)];
         GM->GField->MoveUnit(Unit, MovePos);
     }
-    break;
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AI: Unità ID %d non può né muoversi né attaccare"), Unit->GetGameUnitID());
     }
-
-    // Segna che questa unità ha già agito per questo turno
-    Unit->bHasActed = true;
-
-    UE_LOG(LogTemp, Log, TEXT("ARandomPlayer::OnTurn() - Fine turno AI"));
-    GM->NextTurn();
 }
+
+
+
+
+

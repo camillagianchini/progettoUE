@@ -39,7 +39,7 @@ void AHumanPlayer::BeginPlay()
         GameInstance = Cast<UAWGameInstance>(UGameplayStatics::GetGameInstance(GetWorld()));
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("HumanPlayer::BeginPlay - Pawn spawnato e posseduto?"));
+    //UE_LOG(LogTemp, Warning, TEXT("HumanPlayer::BeginPlay - Pawn spawnato e posseduto?"));
 }
 
 void AHumanPlayer::Tick(float DeltaTime)
@@ -81,12 +81,9 @@ void AHumanPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 
 void AHumanPlayer::OnClick()
 {
-
-    UE_LOG(LogTemp, Warning, TEXT("AHumanPlayer::OnClick() chiamato!"));
-
     // Ottieni il riferimento al GameMode
     AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
-    UE_LOG(LogTemp, Warning, TEXT("Turno corrente: %d"), GM->CurrentPlayer);
+    UE_LOG(LogTemp, Warning, TEXT("Turno corrente: %d"), GM ? GM->CurrentPlayer : -1);
     if (!GM)
     {
         UE_LOG(LogTemp, Error, TEXT("OnClick: GameMode non trovato"));
@@ -102,17 +99,16 @@ void AHumanPlayer::OnClick()
 
     // Ottieni la posizione della tile cliccata
     FVector2D RawTilePosition = GetClickedTilePosition();
-    UE_LOG(LogTemp, Log, TEXT("Posizione cliccata (raw): %s"), *RawTilePosition.ToString());
+    UE_LOG(LogTemp, Log, TEXT("Posizione cliccata: %s"), *RawTilePosition.ToString());
 
     // Converti in coordinate intere per farle corrispondere alle chiavi della TileMap
-    FVector2D TilePosition = FVector2D(FMath::FloorToFloat(RawTilePosition.X), FMath::FloorToFloat(RawTilePosition.Y));
-    UE_LOG(LogTemp, Log, TEXT("Posizione cliccata (arrotondata): %s"), *TilePosition.ToString());
+    FVector2D TilePosition(FMath::FloorToFloat(RawTilePosition.X), FMath::FloorToFloat(RawTilePosition.Y));
 
     // Recupera la tile dal GameField
     ATile* ClickedTile = nullptr;
-    if (GM->GField && GM->GField->GetTileMap().Contains(TilePosition))
+    if (GM->GField && GM->GField->TileMap.Contains(TilePosition))
     {
-        ClickedTile = GM->GField->GetTileMap()[TilePosition];
+        ClickedTile = GM->GField->TileMap[TilePosition];
     }
     if (!ClickedTile)
     {
@@ -146,9 +142,11 @@ void AHumanPlayer::OnClick()
                 {
                     GM->bSniperPlaced.Add(0, true);
                     SpawnedUnit->SetPlayerOwner(0);
-                    // Imposta la posizione di griglia corretta per la nuova unità
+                    SpawnedUnit->SetGameUnitID();
                     SpawnedUnit->SetGridPosition(TilePosition.X, TilePosition.Y);
                     ClickedTile->SetTileStatus(0, ETileStatus::OCCUPIED, SpawnedUnit);
+                    int32 NewUnitKey = GM->GField->GameUnitMap.Num();
+                    GM->GField->GameUnitMap.Add(NewUnitKey, SpawnedUnit);
                     UE_LOG(LogTemp, Warning, TEXT("TileOwner: %d, TileStatus: %d"),
                         ClickedTile->GetTileOwner(), (int32)ClickedTile->GetTileStatus());
                     bPlacedUnit = true;
@@ -168,9 +166,11 @@ void AHumanPlayer::OnClick()
                 {
                     GM->bBrawlerPlaced.Add(0, true);
                     SpawnedUnit->SetPlayerOwner(0);
-                    // Imposta la posizione di griglia corretta per la nuova unità
+                    SpawnedUnit->SetGameUnitID();
                     SpawnedUnit->SetGridPosition(TilePosition.X, TilePosition.Y);
                     ClickedTile->SetTileStatus(0, ETileStatus::OCCUPIED, SpawnedUnit);
+                    int32 NewUnitKey = GM->GField->GameUnitMap.Num();
+                    GM->GField->GameUnitMap.Add(NewUnitKey, SpawnedUnit);
                     UE_LOG(LogTemp, Warning, TEXT("TileOwner: %d, TileStatus: %d"),
                         ClickedTile->GetTileOwner(), (int32)ClickedTile->GetTileStatus());
                     bPlacedUnit = true;
@@ -202,106 +202,65 @@ void AHumanPlayer::OnClick()
     }
 
     // --- Fase di Battaglia ---
-    // Se un'unità è già selezionata, il click viene interpretato come comando per muovere o attaccare.
+    // Se una unità è già selezionata, interpreta il click come comando per muovere o attaccare.
     if (GM->SelectedUnit)
     {
-        // Controlla se l'unità ha già agito in questo turno
-        if (GM->SelectedUnit->bHasActed)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Unità ID=%d ha già eseguito un'azione in questo turno."), GM->SelectedUnit->GetGameUnitID());
-            return;
-        }
 
         ETileGameStatus TileGS = ClickedTile->GetTileGameStatus();
+        // Se la tile è un movimento legale e l'unità non ha ancora mosso
         if (TileGS == ETileGameStatus::LEGAL_MOVE)
         {
             GM->GField->MoveUnit(GM->SelectedUnit, TilePosition);
-            UE_LOG(LogTemp, Log, TEXT("Movimento eseguito sulla tile %s."), *TilePosition.ToString());
-            GM->SelectedUnit->bHasActed = true;
+            GM->SelectedUnit->bHasMoved = true;
             GM->GField->ResetGameStatusField();
             GM->SelectedUnit = nullptr;
-
-            // Dopo l'azione, controlla se tutte le unità umane hanno agito
-            if (GM->TutteLeUnitaHannoAgito(0))
-            {
-                UE_LOG(LogTemp, Log, TEXT("Tutte le unità umane hanno agito. Passaggio del turno all'AI."));
-                GM->NextTurn();
-            }
+            DoNextUnitAction();
             return;
         }
         else if (TileGS == ETileGameStatus::CAN_ATTACK)
         {
             GM->GField->AttackUnit(GM->SelectedUnit, TilePosition);
-            UE_LOG(LogTemp, Log, TEXT("Attacco eseguito sulla tile %s."), *TilePosition.ToString());
-            GM->SelectedUnit->bHasActed = true;
+            GM->SelectedUnit->bHasAttacked = true;
             GM->GField->ResetGameStatusField();
             GM->SelectedUnit = nullptr;
-
-            if (GM->TutteLeUnitaHannoAgito(0))
-            {
-                UE_LOG(LogTemp, Log, TEXT("Tutte le unità umane hanno agito. Passaggio del turno all'AI."));
-                GM->NextTurn();
-            }
+            DoNextUnitAction();
             return;
         }
-        // Se il click è su una tile non evidenziata, può servire per cambiare selezione
+        // Se il click è su una tile occupata (per cambiare selezione)
         if (ClickedTile->GetTileStatus() == ETileStatus::OCCUPIED)
         {
             AGameUnit* NewUnit = ClickedTile->GetGameUnit();
-            if (NewUnit && NewUnit->GetPlayerOwner() == 0)
+            if (NewUnit && NewUnit->GetPlayerOwner() == 0 &&
+                (!NewUnit->bHasMoved || !NewUnit->bHasAttacked))
             {
                 GM->SelectedUnit = NewUnit;
                 UE_LOG(LogTemp, Log, TEXT("Nuova unità selezionata sulla tile %s."), *TilePosition.ToString());
-                ShowLegalMovesForUnit(NewUnit);
+                GM->GField->ShowLegalMovesForUnit(NewUnit);
                 return;
             }
         }
     }
-    else // Nessuna unità è selezionata: seleziona l'unità se è di proprietà del giocatore
+    else // Nessuna unità selezionata: seleziona quella sulla tile se appartiene al giocatore e non ha agito
     {
-        if (ClickedTile->GetTileStatus() == ETileStatus::OCCUPIED)
+        if(ClickedTile->GetTileStatus() == ETileStatus::OCCUPIED)
         {
             AGameUnit* Unit = ClickedTile->GetGameUnit();
-            if (Unit && Unit->GetPlayerOwner() == 0)
+            if (Unit && Unit->GetPlayerOwner() == 0 &&
+                (!Unit->bHasMoved || !Unit->bHasAttacked))
             {
-                if (Unit->bHasActed)
-                {
-                    UE_LOG(LogTemp, Warning, TEXT("L'unità ID=%d ha già agito e non può eseguire altre azioni."), Unit->GetGameUnitID());
-                    return;
-                }
-
-                ClickedTile->SetTileGameStatus(ETileGameStatus::SELECTED);
                 GM->SelectedUnit = Unit;
-                UE_LOG(LogTemp, Log, TEXT("Unità selezionata sulla tile %s"), *TilePosition.ToString());
-
-                // Debug: stampa lo stato delle tile vicine
-                for (int dx = -1; dx <= 1; dx++)
-                {
-                    for (int dy = -1; dy <= 1; dy++)
-                    {
-                        if (FMath::Abs(dx) + FMath::Abs(dy) == 1)
-                        {
-                            FVector2D NeighPos = TilePosition + FVector2D(dx, dy);
-                            if (GM->GField->TileMap.Contains(NeighPos))
-                            {
-                                ATile* T = GM->GField->TileMap[NeighPos];
-                                UE_LOG(LogTemp, Warning, TEXT("Vicino (%.0f, %.0f) -> %s"),
-                                    NeighPos.X, NeighPos.Y, *T->GameStatusToString());
-                            }
-                        }
-                    }
-                }
-
-                ShowLegalMovesForUnit(Unit);
+                UE_LOG(LogTemp, Log, TEXT("Unità selezionata sulla tile %s."), *TilePosition.ToString());
+                GM->GField->ShowLegalMovesForUnit(Unit);
                 return;
             }
             else
             {
-                UE_LOG(LogTemp, Warning, TEXT("La tile cliccata non contiene una unità di proprietà del giocatore."));
+                UE_LOG(LogTemp, Warning, TEXT("L'unità sulla tile ha già completato le azioni."));
             }
         }
     }
 }
+
 
 
 FVector2D AHumanPlayer::GetClickedTilePosition() const
@@ -349,87 +308,34 @@ FVector2D AHumanPlayer::GetClickedTilePosition() const
 
 }
 
-void AHumanPlayer::ShowLegalMovesForUnit(AGameUnit* Unit)
-{
-    UE_LOG(LogTemp, Warning, TEXT("chiamato ShowLegalMovesForUnit"));
-    if (!Unit)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("ShowLegalMovesForUnit: Unità nulla."));
-        return;
-    }
 
+void AHumanPlayer::DoNextUnitAction()
+{
+    // Recupera il GameMode e il GameField
     AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
     if (!GM || !GM->GField)
     {
-        UE_LOG(LogTemp, Warning, TEXT("ShowLegalMovesForUnit: GameMode o GameField non trovato."));
+        UE_LOG(LogTemp, Warning, TEXT("DoNextUnitAction: GameMode o GameField non trovati."));
         return;
     }
 
-    // Reset dello stato di evidenziazione di tutte le tile
-    GM->GField->ResetGameStatusField();
-
-    // Calcola le mosse legali di movimento
-    TArray<FVector2D> LegalMoves = Unit->CalculateLegalMoves();
-    TArray<FVector2D> ValidMoves;
-    for (const FVector2D& MovePos : LegalMoves)
+    // Cerca la prima unità appartenente all'umano (PlayerOwner == 0) che non ha ancora agito
+    for (auto& Pair : GM->GField->GameUnitMap)
     {
-        if (GM->GField->IsValidPosition(MovePos))
+        AGameUnit* Unit = Pair.Value;
+        if (Unit && Unit->GetPlayerOwner() == 0 && !(Unit->bHasMoved && Unit->bHasAttacked))
         {
-            ATile* Tile = GM->GField->GetTileMap()[MovePos];
-            if (Tile && Tile->GetTileStatus() == ETileStatus::EMPTY)
-            {
-                ValidMoves.Add(MovePos);
-            }
+            // Se la trovi, la imposti come unità selezionata e ne evidenzi le mosse legali
+            GM->SelectedUnit = Unit;
+            GM->GField->ShowLegalMovesForUnit(Unit);
+            UE_LOG(LogTemp, Log, TEXT("DoNextUnitAction: Selezionata unità ID %d"), Unit->GetGameUnitID());
+            return;
         }
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("Numero di mosse legali trovate: %d"), ValidMoves.Num());
-    // Evidenzia come LEGAL_MOVE
-    for (const FVector2D& MovePos : ValidMoves)
-    {
-        if (GM->GField->IsValidPosition(MovePos))
-        {
-            ATile* Tile = GM->GField->GetTileMap()[MovePos];
-            if (Tile)
-            {
-                Tile->SetTileGameStatus(ETileGameStatus::LEGAL_MOVE);
-            }
-        }
-    }
-
-    // Calcola le possibili mosse di attacco
-    TArray<FVector2D> AttackMoves = Unit->CalculateAttackMoves();
-    TArray<FVector2D> ValidAttacks;
-    for (const FVector2D& AttackPos : AttackMoves)
-    {
-        if (GM->GField->IsValidPosition(AttackPos))
-        {
-            ATile* Tile = GM->GField->GetTileMap()[AttackPos];
-            // Considera l'attacco se la tile è occupata da un nemico
-            if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
-            {
-                AGameUnit* Target = Tile->GetGameUnit();
-                if (Target && Target->GetPlayerOwner() != Unit->GetPlayerOwner())
-                {
-                    ValidAttacks.Add(AttackPos);
-                }
-            }
-        }
-    }
-
-    UE_LOG(LogTemp, Warning, TEXT("Numero di attacchi validi trovati: %d"), ValidAttacks.Num());
-    // Evidenzia come CAN_ATTACK
-    for (const FVector2D& AttackPos : ValidAttacks)
-    {
-        if (GM->GField->IsValidPosition(AttackPos))
-        {
-            ATile* Tile = GM->GField->GetTileMap()[AttackPos];
-            if (Tile)
-            {
-                Tile->SetTileGameStatus(ETileGameStatus::CAN_ATTACK);
-            }
-        }
-    }
+    // Se non trovi nessuna unità, significa che tutte hanno agito: passa il turno all'AI
+    UE_LOG(LogTemp, Warning, TEXT("DoNextUnitAction: Tutte le unità umane hanno agito. Passaggio del turno all'AI."));
+    GM->NextTurn();
 }
 
 

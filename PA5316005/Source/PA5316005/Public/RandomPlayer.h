@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameUnit.h"
 #include "PlayerInterface.h"
 #include "RandomPlayer.generated.h"
 
@@ -16,8 +17,17 @@ public:
 
     ARandomPlayer();
 
+    // RandomPlayer.h
+    UPROPERTY()
+    TArray<AGameUnit*> UnitsSequence;
+    
+
+    int32 SequenceIndex;
+
+
 private:
     void PerformRandomActionOnUnit(class AGameUnit* Unit);
+    void DoNextUnitAction();
 };
 
 
