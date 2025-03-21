@@ -87,6 +87,8 @@ protected:
 
 
 public:
+
+	virtual TArray<FVector2D> CalculateAttackMoves() const;
 	// ************ SETTERS ************
 	// Set a unique GameUnit ID (e.g., auto-increment)
 	void SetGameUnitID();
@@ -150,9 +152,9 @@ public:
 	// Only horizontal and vertical moves are considered.
 	virtual TArray<FVector2D> CalculateLegalMoves();
 
-	// Calcola e restituisce le mosse legali per l'attacco basate su AttackRange.
-// Solo spostamenti orizzontali e verticali sono considerati.
-	virtual TArray<FVector2D> CalculateAttackMoves() const;
+
+	
+
 
 
 	// Apply damage to the unit; if HitPoints reach 0, the unit is considered dead.

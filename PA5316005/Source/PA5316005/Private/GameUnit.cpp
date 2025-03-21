@@ -49,6 +49,11 @@ void AGameUnit::BeginPlay()
 
 }
 
+TArray<FVector2D> AGameUnit::CalculateAttackMoves() const
+{
+	return TArray<FVector2D>();
+}
+
 void AGameUnit::SetGameUnitID()
 {
 	// Incrementa l'ID e lo assegna all'unità
@@ -364,78 +369,6 @@ TArray<FVector2D> AGameUnit::CalculatePath(const FVector2D& EndPos)
 
 
 
-
-TArray<FVector2D> AGameUnit::CalculateAttackMoves() const
-{
-	TArray<FVector2D> AttackableCells;
-	if (!GameMode || !GameMode->GField)
-	{
-		return AttackableCells;
-	}
-
-	AGameField* GF = GameMode->GField;
-	FVector2D MyPos = GetGridPosition();
-
-	if (GameUnitType == EGameUnitType::BRAWLER)
-	{
-		// Per il Brawler, l'attacco a corto raggio: considera le celle adiacenti (su, giù, sinistra, destra)
-		static const TArray<FVector2D> Directions = {
-			FVector2D(1, 0), FVector2D(-1, 0),
-			FVector2D(0, 1), FVector2D(0, -1)
-		};
-		for (const FVector2D& Dir : Directions)
-		{
-			FVector2D Candidate = MyPos + Dir;
-			if (GF->IsValidPosition(Candidate) && GF->TileMap.Contains(Candidate))
-			{
-				ATile* Tile = GF->TileMap[Candidate];
-				if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
-				{
-					AGameUnit* OtherUnit = Tile->GetGameUnit();
-					if (OtherUnit && OtherUnit->GetPlayerOwner() != this->GetPlayerOwner())
-					{
-						AttackableCells.Add(Candidate);
-					}
-				}
-			}
-		}
-	}
-	else // SNIPER
-	{
-		// Per lo Sniper, ignora gli ostacoli: utilizza la distanza di Manhattan.
-		// Itera solo sulle celle entro la dimensione della griglia.
-		for (int32 x = 0; x < GameMode->FieldSize; x++)
-		{
-			for (int32 y = 0; y < GameMode->FieldSize; y++)
-			{
-				FVector2D Candidate(x, y);
-				// Calcola la distanza di Manhattan
-				int32 ManhattanDist = FMath::Abs(Candidate.X - MyPos.X) + FMath::Abs(Candidate.Y - MyPos.Y);
-				if (ManhattanDist > 0 && ManhattanDist <= AttackRange)
-				{
-					if (GF->TileMap.Contains(Candidate))
-					{
-						ATile* Tile = GF->TileMap[Candidate];
-						if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
-						{
-							AGameUnit* OtherUnit = Tile->GetGameUnit();
-							if (OtherUnit && OtherUnit->GetPlayerOwner() != this->GetPlayerOwner())
-							{
-								AttackableCells.Add(Candidate);
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return AttackableCells;
-}
-
-
-
-
 void AGameUnit::TakeDamageUnit(int32 DamageAmount)
 {
 	HitPoints -= DamageAmount;
@@ -449,6 +382,7 @@ bool AGameUnit::IsDead() const
 {
 	return HitPoints <= 0;
 }
+
 
 
 

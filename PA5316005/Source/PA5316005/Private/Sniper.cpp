@@ -1,5 +1,7 @@
 #include "Sniper.h"
-
+#include "AWGameMode.h"
+#include "Tile.h"
+#include "GameField.h"
 
 ASniper::ASniper()
 {
@@ -55,6 +57,40 @@ void ASniper::HandleCounterAttack(AGameUnit* AttackedUnit)
 		TakeDamageUnit(CounterDamage);
 		UE_LOG(LogTemp, Log, TEXT("Sniper (ID: %d) riceve danno da contrattacco: %d"), GetGameUnitID(), CounterDamage);
 	}
+}
+
+// In ASniper.cpp
+TArray<FVector2D> ASniper::CalculateAttackMoves() const
+{
+	TArray<FVector2D> AttackableCells;
+	AGameField* GF = GameMode->GField;
+	FVector2D MyPos = GetGridPosition();
+
+	for (int32 x = 0; x < GameMode->FieldSize; x++)
+	{
+		for (int32 y = 0; y < GameMode->FieldSize; y++)
+		{
+			FVector2D Candidate(x, y);
+			int32 ManhattanDist = FMath::Abs(Candidate.X - MyPos.X) + FMath::Abs(Candidate.Y - MyPos.Y);
+			if (ManhattanDist > 0 && ManhattanDist <= AttackRange)
+			{
+				if (GF->TileMap.Contains(Candidate))
+				{
+					ATile* Tile = GF->TileMap[Candidate];
+					if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
+					{
+						AGameUnit* OtherUnit = Tile->GetGameUnit();
+						if (OtherUnit && OtherUnit->GetPlayerOwner() != GetPlayerOwner())
+						{
+							AttackableCells.Add(Candidate);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return AttackableCells;
 }
 
 

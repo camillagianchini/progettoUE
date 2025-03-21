@@ -266,25 +266,25 @@ TArray<FVector2D> AGameField::PossibleMoves(FVector2D Position) const
 }
 
 
-TArray<FVector2D> AGameField::LegalMoves(FVector2D Position) const
-{
-	if (!IsValidPosition(Position) || (*TileMap.Find(Position))->GetTileOwner() == NOT_ASSIGNED)
-	{
-		return TArray<FVector2D>();
-	}
-
-	TArray<FVector2D> PossibleMovesOfGameUnit = PossibleMoves(Position);
-
-	AAWGameMode* GameMode = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
-
-	for (int32 index = PossibleMovesOfGameUnit.Num() - 1; index >= 0; --index)
-	{
-		GameMode->DoMove(PossibleMovesOfGameUnit[index], false);
-
-	}
-
-	return PossibleMovesOfGameUnit;
-}
+//TArray<FVector2D> AGameField::LegalMoves(FVector2D Position) const
+//{
+//	if (!IsValidPosition(Position) || (*TileMap.Find(Position))->GetTileOwner() == NOT_ASSIGNED)
+//	{
+//		return TArray<FVector2D>();
+//	}
+//
+//	TArray<FVector2D> PossibleMovesOfGameUnit = PossibleMoves(Position);
+//
+//	AAWGameMode* GameMode = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+//
+//	for (int32 index = PossibleMovesOfGameUnit.Num() - 1; index >= 0; --index)
+//	{
+//		GameMode->DoMove(PossibleMovesOfGameUnit[index], false);
+//
+//	}
+//
+//	return PossibleMovesOfGameUnit;
+//}
 
 
 void AGameField::ShowLegalMovesInTheField()
@@ -392,7 +392,7 @@ ATile* AGameField::GetRandomFreeTile() const
 
 
 
-void AGameField::MoveUnit(AGameUnit* Unit, const FVector2D& NewPos)
+void AGameField::MoveUnit(AGameUnit* Unit, const FVector2D& NewPos, TFunction<void()> OnMovementFinished)
 {
 	if (!Unit)
 	{
@@ -400,56 +400,53 @@ void AGameField::MoveUnit(AGameUnit* Unit, const FVector2D& NewPos)
 		return;
 	}
 
+	// Calcola il percorso da seguire
 	FVector2D StartPos = Unit->GetGridPosition();
 	TArray<FVector2D> FoundPath = Unit->CalculatePath(NewPos);
 
 	if (FoundPath.Num() == 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("MoveUnit: Nessun percorso trovato da %s a %s."),
-			*StartPos.ToString(), *NewPos.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("MoveUnit: Nessun percorso trovato da %s a %s."), *StartPos.ToString(), *NewPos.ToString());
 		return;
 	}
 
-	// Svuota la tile di partenza
+	// Libera la tile di partenza
 	if (TileMap.Contains(StartPos))
 	{
 		ATile* OldTile = TileMap[StartPos];
 		OldTile->SetTileStatus(AGameField::NOT_ASSIGNED, ETileStatus::EMPTY, nullptr);
 	}
 
-	// Copia il Path in uno smart pointer, così rimane valido finché la lambda non finisce
+	// Copia il percorso in uno smart pointer per mantenerlo valido nella lambda
 	TSharedPtr<TArray<FVector2D>> PathPtr = MakeShared<TArray<FVector2D>>(FoundPath);
 
-	// Indice dello step corrente
-	int32 CurrentStep = 0;
+	// Usa dei TSharedPtr per l'indice corrente e il TimerHandle
+	TSharedPtr<int32> CurrentStepPtr = MakeShared<int32>(0);
+	TSharedPtr<FTimerHandle> TimerHandlePtr = MakeShared<FTimerHandle>();
 
-	// Dichiarazione del TimerHandle
-	FTimerHandle MoveTimerHandle;
-
-	// Creiamo un delegate (lambda) che cattura TUTTO per valore
+	// Crea una lambda che gestisce il movimento step-by-step
 	FTimerDelegate TimerDelegate;
-	TimerDelegate.BindLambda([this, Unit, PathPtr, CurrentStep, NewPos, MoveTimerHandle]() mutable
+	TimerDelegate.BindLambda([this, Unit, PathPtr, NewPos, CurrentStepPtr, TimerHandlePtr, OnMovementFinished]() mutable
 		{
-			// Se l’unità è distrutta nel frattempo, meglio fermare il timer
+			// Se l'unità è stata distrutta, ferma il timer
 			if (!Unit || !Unit->IsValidLowLevel())
 			{
-				GetWorld()->GetTimerManager().ClearTimer(MoveTimerHandle);
+				GetWorld()->GetTimerManager().ClearTimer(*TimerHandlePtr);
 				return;
 			}
 
-			// Se ci sono ancora step da fare
-			if (CurrentStep < PathPtr->Num())
+			// Se ci sono ancora passi da compiere nel percorso
+			if (*CurrentStepPtr < PathPtr->Num())
 			{
-				// Otteniamo la prossima cella
-				FVector2D CellPos = (*PathPtr)[CurrentStep];
-
-				// Convertiamo in coordinate 3D
+				// Ottieni la prossima cella del percorso
+				FVector2D CellPos = (*PathPtr)[*CurrentStepPtr];
 				FVector StepPos = GetRelativePositionByXYPosition(CellPos.X, CellPos.Y);
-				// Spostiamo la mesh dell’unità
+
+				// Aggiorna la posizione dell'unità (mantenendo l'altezza attuale)
 				Unit->SetActorLocation(FVector(StepPos.X, StepPos.Y, Unit->GetActorLocation().Z));
 
-				// Se siamo all'ultimo step, occupiamo la tile di destinazione
-				if (CurrentStep == PathPtr->Num() - 1)
+				// Se siamo all'ultimo passo, aggiorna la tile di destinazione e la posizione in griglia
+				if (*CurrentStepPtr == PathPtr->Num() - 1)
 				{
 					if (TileMap.Contains(NewPos))
 					{
@@ -457,25 +454,29 @@ void AGameField::MoveUnit(AGameUnit* Unit, const FVector2D& NewPos)
 						DestTile->SetTileStatus(Unit->GetPlayerOwner(), ETileStatus::OCCUPIED, Unit);
 					}
 					Unit->SetGridPosition(NewPos.X, NewPos.Y);
+
+					// Movimento completato: chiama il callback se esiste
+					if (OnMovementFinished)
+					{
+						OnMovementFinished();
+					}
 				}
 
-				CurrentStep++;
+				// Incrementa l'indice per il prossimo step
+				(*CurrentStepPtr)++;
 			}
 			else
 			{
-				// Percorso terminato: ferma il timer
-				GetWorld()->GetTimerManager().ClearTimer(MoveTimerHandle);
+				// Percorso completato: ferma il timer
+				GetWorld()->GetTimerManager().ClearTimer(*TimerHandlePtr);
 			}
 		});
 
-	// Avviamo il timer (ripetuto ogni 0.1 secondi finché non lo fermiamo)
-	GetWorld()->GetTimerManager().SetTimer(
-		MoveTimerHandle,      // handle
-		TimerDelegate,        // delegato
-		0.1f,                 // intervallo
-		true                  // loop
-	);
+	// Avvia il timer: la lambda verrà eseguita ogni 0.1 secondi finché non viene fermata
+	GetWorld()->GetTimerManager().SetTimer(*TimerHandlePtr, TimerDelegate, 0.1f, true);
 }
+
+
 
 
 
@@ -544,11 +545,9 @@ void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 	}
 }
 
-
-
 void AGameField::ShowLegalMovesForUnit(AGameUnit* Unit)
 {
-	UE_LOG(LogTemp, Warning, TEXT("chiamato ShowLegalMovesForUnit"));
+	UE_LOG(LogTemp, Warning, TEXT("Chiamato ShowLegalMovesForUnit"));
 	if (!Unit)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("ShowLegalMovesForUnit: Unità nulla."));
@@ -562,47 +561,52 @@ void AGameField::ShowLegalMovesForUnit(AGameUnit* Unit)
 		return;
 	}
 
-	// Reset dello stato di evidenziazione di tutte le tile
-	GM->GField->ResetGameStatusField();
+	// Resetta lo stato di evidenziazione di tutte le tile
+	ResetGameStatusField();
 
-	// Calcola le mosse legali di movimento
-	TArray<FVector2D> LegalMoves = Unit->CalculateLegalMoves();
-	TArray<FVector2D> ValidMoves;
-	for (const FVector2D& MovePos : LegalMoves)
+	// Se l'unità non ha ancora mosso, evidenzia le celle di movimento
+	if (!Unit->bHasMoved)
 	{
-		if (GM->GField->IsValidPosition(MovePos))
+		TArray<FVector2D> LegalMoves = Unit->CalculateLegalMoves();
+		TArray<FVector2D> ValidMoves;
+		for (const FVector2D& MovePos : LegalMoves)
 		{
-			ATile* Tile = GM->GField->GetTileMap()[MovePos];
-			if (Tile && Tile->GetTileStatus() == ETileStatus::EMPTY)
+			if (IsValidPosition(MovePos))
 			{
-				ValidMoves.Add(MovePos);
+				ATile* Tile = TileMap[MovePos];
+				if (Tile && Tile->GetTileStatus() == ETileStatus::EMPTY)
+				{
+					ValidMoves.Add(MovePos);
+				}
+			}
+		}
+		UE_LOG(LogTemp, Warning, TEXT("Numero di mosse legali trovate: %d"), ValidMoves.Num());
+		for (const FVector2D& MovePos : ValidMoves)
+		{
+			if (IsValidPosition(MovePos))
+			{
+				ATile* Tile = TileMap[MovePos];
+				if (Tile)
+				{
+					Tile->SetTileGameStatus(ETileGameStatus::LEGAL_MOVE);
+				}
 			}
 		}
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("Numero di mosse legali trovate: %d"), ValidMoves.Num());
-	// Evidenzia come LEGAL_MOVE
-	for (const FVector2D& MovePos : ValidMoves)
-	{
-		if (GM->GField->IsValidPosition(MovePos))
-		{
-			ATile* Tile = GM->GField->GetTileMap()[MovePos];
-			if (Tile)
-			{
-				Tile->SetTileGameStatus(ETileGameStatus::LEGAL_MOVE);
-			}
-		}
-	}
+}
 
-	// Calcola le possibili mosse di attacco
+void AGameField::ShowLegalAttackOptionsForUnit(AGameUnit* Unit)
+{
+	// Non è necessario resettare qui se ShowLegalMovesForUnit l'ha già fatto
 	TArray<FVector2D> AttackMoves = Unit->CalculateAttackMoves();
 	TArray<FVector2D> ValidAttacks;
 	for (const FVector2D& AttackPos : AttackMoves)
 	{
-		if (GM->GField->IsValidPosition(AttackPos))
+		if (IsValidPosition(AttackPos))
 		{
-			ATile* Tile = GM->GField->GetTileMap()[AttackPos];
-			// Considera l'attacco se la tile è occupata da un nemico
+			ATile* Tile = TileMap[AttackPos];
+			// Considera valida la mossa di attacco se la tile è occupata da un nemico
 			if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
 			{
 				AGameUnit* Target = Tile->GetGameUnit();
@@ -613,14 +617,12 @@ void AGameField::ShowLegalMovesForUnit(AGameUnit* Unit)
 			}
 		}
 	}
-
 	UE_LOG(LogTemp, Warning, TEXT("Numero di attacchi validi trovati: %d"), ValidAttacks.Num());
-	// Evidenzia come CAN_ATTACK
 	for (const FVector2D& AttackPos : ValidAttacks)
 	{
-		if (GM->GField->IsValidPosition(AttackPos))
+		if (IsValidPosition(AttackPos))
 		{
-			ATile* Tile = GM->GField->GetTileMap()[AttackPos];
+			ATile* Tile = TileMap[AttackPos];
 			if (Tile)
 			{
 				Tile->SetTileGameStatus(ETileGameStatus::CAN_ATTACK);
@@ -628,6 +630,11 @@ void AGameField::ShowLegalMovesForUnit(AGameUnit* Unit)
 		}
 	}
 }
+
+
+
+
+
 
 
 

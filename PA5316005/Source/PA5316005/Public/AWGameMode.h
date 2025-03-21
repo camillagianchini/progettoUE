@@ -41,25 +41,6 @@ public:
     void ResetActionsForPlayer(int32 Player);
     void EndGame();
 
-    UFUNCTION(BlueprintCallable)
-    bool DoMove(FVector2D Destination, bool bTestOnly);
-
-    // Se il tuo codice chiama TurnNextPlayer(), dichiari la funzione:
-    UFUNCTION(BlueprintCallable)
-    void TurnNextPlayer();
-
-    // Se chiama SetSelectedTile(FVector2D), dichiari la funzione:
-    UFUNCTION(BlueprintCallable)
-    void SetSelectedTile(FVector2D Position);
-
-    // Se chiama PlaceUnit(...) con certi parametri, dichiara la funzione:
-    UFUNCTION(BlueprintCallable)
-    void PlaceUnit(int32 Player, FVector2D Position /* o altro se necessario */);
-
-    // Se chiama DoAttack(...) con certi parametri, dichiara la funzione:
-    UFUNCTION(BlueprintCallable)
-    void DoAttack(FVector2D AttackerPosition, FVector2D TargetPosition);
-
 
     // Variabili di stato
 

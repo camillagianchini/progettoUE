@@ -1,12 +1,15 @@
 #pragma once
 
-#include "Tile.h"
+
 #include "CoreMinimal.h"
+#include "Templates/Function.h"
+#include "Tile.h"
 #include "GameFramework/Actor.h"
 //#include "Blueprint/UserWidget.h"
 #include "GameField.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnReset);
+
 
 UCLASS()
 class PA5316005_API AGameField : public AActor
@@ -103,7 +106,6 @@ public:
 
 
 
-	TArray<FVector2D> LegalMoves(FVector2D Position) const;
 
 	TArray<FVector2D> PossibleMoves(FVector2D Position) const;
 
@@ -115,9 +117,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void ShowLegalMovesForUnit(AGameUnit* Unit);
 
-	UFUNCTION(BlueprintCallable, Category = "Game Field")
-	void MoveUnit(AGameUnit* Unit, const FVector2D& NewPos);
+
+	void MoveUnit(AGameUnit* Unit, const FVector2D& NewPos, TFunction<void()> OnMovementFinished);
+
 
 	UFUNCTION(BlueprintCallable, Category = "Game Field")
 	void AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos);
+
+	void ShowLegalAttackOptionsForUnit(AGameUnit* Unit);
 };

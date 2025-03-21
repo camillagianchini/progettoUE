@@ -95,11 +95,6 @@ void AAWGameMode::CoinTossForStartingPlayer()
     PlaceUnitForCurrentPlayer();
 }
 
-//void AAWGameMode::ChoosePlayerAndStartGame()
-//{
-    // Inizia la fase di posizionamento chiamando PlaceUnitForCurrentPlayer()
-   // PlaceUnitForCurrentPlayer();
-//}
 
 void AAWGameMode::PlaceUnitForCurrentPlayer()
 {
@@ -261,19 +256,6 @@ bool AAWGameMode::AllUnitsHaveActed(int32 Player)
     return true;
 }
 
-
-
-
-
-
-
-
-bool AAWGameMode::CondizioniDiVittoria()
-{
-    // Implementa la logica per verificare se un giocatore ha vinto (ad esempio, tutte le unità avversarie eliminate)
-    return false;
-}
-
 void AAWGameMode::ResetActionsForPlayer(int32 Player)
 {
     for (auto& Pair : GField->GameUnitMap)
@@ -293,41 +275,20 @@ void AAWGameMode::ResetActionsForPlayer(int32 Player)
 
 
 
-bool AAWGameMode::DoMove(FVector2D Destination, bool bTestOnly)
+bool AAWGameMode::CondizioniDiVittoria()
 {
-    // Esempio di logica:
-    // - Se bTestOnly == true, controlli solo se la mossa è valida
-    // - Altrimenti, sposti effettivamente l'unità
-    UE_LOG(LogTemp, Log, TEXT("DoMove chiamato con Destination=%s, bTestOnly=%s"),
-        *Destination.ToString(), bTestOnly ? TEXT("true") : TEXT("false"));
-
-    // Restituisci true se la mossa è valida, false altrimenti
-    return true;
+    // Implementa la logica per verificare se un giocatore ha vinto (ad esempio, tutte le unità avversarie eliminate)
+    return false;
 }
 
-void AAWGameMode::TurnNextPlayer()
-{
-    UE_LOG(LogTemp, Warning, TEXT("TurnNextPlayer() stub called."));
-    // Implementa la logica per passare al prossimo giocatore, se ti serve
-}
 
-void AAWGameMode::SetSelectedTile(FVector2D Position)
-{
-    UE_LOG(LogTemp, Warning, TEXT("SetSelectedTile() stub called with Pos: %s"), *Position.ToString());
-    // Se la logica di selezione tile è altrove, puoi lasciarlo vuoto
-}
 
-void AAWGameMode::PlaceUnit(int32 Player, FVector2D Position)
-{
-    UE_LOG(LogTemp, Warning, TEXT("PlaceUnit() stub called for Player %d at %s"), Player, *Position.ToString());
-    // Qui potresti effettivamente spawnare l'unità, se serve
-}
 
-void AAWGameMode::DoAttack(FVector2D AttackerPosition, FVector2D TargetPosition)
-{
-    UE_LOG(LogTemp, Warning, TEXT("DoAttack() stub called from %s to %s"), *AttackerPosition.ToString(), *TargetPosition.ToString());
-    // Implementa qui la logica d'attacco (danno, calcolo contrattacco, ecc.)
-}
+
+
+
+
+
 
 
 

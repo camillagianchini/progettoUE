@@ -1,4 +1,7 @@
 #include "Brawler.h"
+#include "AWGameMode.h"
+#include "Tile.h"
+#include "GameField.h"
 
 
 ABrawler::ABrawler()
@@ -16,11 +19,45 @@ void ABrawler::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Assegna un ID univoco all'unità
-	SetGameUnitID();
 
-	// Eventuali altre inizializzazioni specifiche per il Brawler.
+	SetGameUnitID();
+	UE_LOG(LogTemp, Warning, TEXT("ABrawler::BeginPlay - Type=%d, ID=%d"),
+		(int32)GetGameUnitType(), GetGameUnitID());
 }
 
+// In ABrawler.cpp
+TArray<FVector2D> ABrawler::CalculateAttackMoves() const
+{
+    TArray<FVector2D> AttackableCells;
+    AGameField* GF = GameMode->GField;
+    FVector2D MyPos = GetGridPosition();
+
+    // Solo 4 direzioni ortogonali (su, giù, sinistra, destra)
+    const TArray<FVector2D> Directions = {
+        FVector2D(1, 0),
+        FVector2D(-1, 0),
+        FVector2D(0, 1),
+        FVector2D(0, -1)
+    };
+
+    for (const FVector2D& Dir : Directions)
+    {
+        FVector2D Candidate = MyPos + Dir;
+        if (GF->IsValidPosition(Candidate) && GF->TileMap.Contains(Candidate))
+        {
+            ATile* Tile = GF->TileMap[Candidate];
+            if (Tile)
+            {
+                AGameUnit* OtherUnit = Tile->GetGameUnit();
+                if (OtherUnit && OtherUnit->GetPlayerOwner() != GetPlayerOwner())
+                {
+                    AttackableCells.Add(Candidate);
+                }
+            }
+        }
+    }
+
+    return AttackableCells;
+}
 
 
