@@ -12,12 +12,12 @@ void UAWGameInstance::SetOpponent(const int32 SelectedOpp)
 	// Per esempio, potresti salvare SelectedOpp in una variabile membro (non mostrata in questo esempio).
 }
 
-int32 UAWGameInstance::GetScoreHumanPlayer() const
+int32 UAWGameInstance::GetScoreHumanPlayer() 
 {
 	return ScoreHumanPlayer;
 }
 
-int32 UAWGameInstance::GetScoreAiPlayer() const
+int32 UAWGameInstance::GetScoreAiPlayer() 
 {
 	return ScoreAiPlayer;
 }

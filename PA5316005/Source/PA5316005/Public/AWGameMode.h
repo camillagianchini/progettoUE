@@ -4,7 +4,9 @@
 #include "GameFramework/GameModeBase.h"
 #include "Sniper.h"
 #include "Brawler.h"
+
 #include "AWGameMode.generated.h"
+
 
 // Definizione dell'enum per le fasi del gioco
 UENUM(BlueprintType)
@@ -37,9 +39,9 @@ public:
     // Funzioni per la fase di battaglia
     void NextTurn();
     bool AllUnitsHaveActed(int32 Player);
-    bool CondizioniDiVittoria();
     void ResetActionsForPlayer(int32 Player);
     void EndGame();
+
 
 
     // Variabili di stato
@@ -51,7 +53,7 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Turn Management")
     int32 StartingPlayer;
 
-    
+    bool bFirstTurn;
 
     // Dimensione del campo (griglia NxN)
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -104,7 +106,6 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Turn Management")
     AGameUnit* SelectedUnit;
 
-  
 
     // Fase corrente del gioco: Placement oppure Battle
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

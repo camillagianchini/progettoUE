@@ -47,15 +47,8 @@ void AHumanPlayer::Tick(float DeltaTime)
     Super::Tick(DeltaTime);
 }
 
-// IPlayerInterface
-void AHumanPlayer::OnTurn()
-{
-    IsMyTurn = true;
-    if (GameInstance)
-    {
-        GameInstance->SetTurnMessage(TEXT("Human Turn!"));
-    }
-}
+
+
 
 void AHumanPlayer::OnWin()
 {
@@ -81,6 +74,8 @@ void AHumanPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 
 void AHumanPlayer::OnClick()
 {
+
+
     // Ottieni il riferimento al GameMode
     AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
     UE_LOG(LogTemp, Warning, TEXT("Turno corrente: %d"), GM ? GM->CurrentPlayer : -1);
@@ -96,6 +91,9 @@ void AHumanPlayer::OnClick()
         UE_LOG(LogTemp, Warning, TEXT("Non è il turno dell'umano."));
         return;
     }
+
+    GameInstance->SetTurnMessage("Human Turn");
+
 
     // Ottieni la posizione della tile cliccata
     FVector2D RawTilePosition = GetClickedTilePosition();
@@ -210,11 +208,17 @@ void AHumanPlayer::OnClick()
             if (Unit && Unit->GetPlayerOwner() == 0 && !(Unit->bHasMoved && Unit->bHasAttacked))
             {
                 GameMode->SelectedUnit = Unit;
-                GameMode->GField->ResetGameStatusField();
+                // Imposta la tile in cui si trova l'unità come SELECTED
+                ClickedTile->SetTileGameStatus(ETileGameStatus::SELECTED);
+                // Applica il materiale corrispondente (in questo caso blu)
+                ClickedTile->SetTileMaterial();
+                // Ora mostra le altre opzioni (ad es. le tile in cui l'unità può muoversi)
                 GameMode->GField->ShowLegalMovesForUnit(Unit);
                 UE_LOG(LogTemp, Log, TEXT("Unità selezionata con ID %d per movimento."), Unit->GetGameUnitID());
             }
         }
+
+
         return;
     }
     else // Abbiamo già un'unità selezionata
@@ -244,6 +248,8 @@ void AHumanPlayer::OnClick()
                     SelectedUnit->bHasMoved = true;
                     UE_LOG(LogTemp, Log, TEXT("Unità ID=%d mossa in X=%.0f Y=%.0f"),
                         SelectedUnit->GetGameUnitID(), TilePosition.X, TilePosition.Y);
+
+                
 
                     // Resetta le evidenziazioni
                     GM->GField->ResetGameStatusField();
@@ -372,7 +378,8 @@ void AHumanPlayer::DoNextUnitAction()
     for (auto& Pair : GameMode->GField->GameUnitMap)
     {
         AGameUnit* U = Pair.Value;
-        if (U && U->GetPlayerOwner() == 0 && !(U->bHasMoved && U->bHasAttacked))
+        // Usa IsValid() per controllare che l'unità sia valida
+        if (IsValid(U) && U->GetPlayerOwner() == 0 && !(U->bHasMoved && U->bHasAttacked))
         {
             NextUnit = U;
             break;
@@ -382,7 +389,6 @@ void AHumanPlayer::DoNextUnitAction()
     if (!NextUnit)
     {
 
-        // Se nessuna unità è disponibile, passa il turno all'AI
         GameMode->NextTurn();
     }
     else

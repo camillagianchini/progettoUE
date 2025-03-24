@@ -2,13 +2,15 @@
 #include "AWGameMode.h"
 #include "GameField.h"
 #include "GameUnit.h"
+#include "AWGameInstance.h"
+#include "AWGameInstance.h"
 #include "EngineUtils.h"
 
 ARandomPlayer::ARandomPlayer()
 {
-    // Differenzia il PlayerNumber dall'umano (0)
     PlayerNumber = 1;
     SequenceIndex = 0;
+
 }
 
 void ARandomPlayer::OnTurn()
@@ -22,22 +24,23 @@ void ARandomPlayer::OnTurn()
     AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
     if (!GM)
     {
-        UE_LOG(LogTemp, Error, TEXT("ARandomPlayer::OnTurn() - GetAuthGameMode() è nullptr!"));
+        UE_LOG(LogTemp, Error, TEXT("ARandomPlayer::OnTurn() - GameMode nullo."));
         return;
     }
 
     if (!GM->GField)
     {
-        UE_LOG(LogTemp, Error, TEXT("ARandomPlayer::OnTurn() - GField è nullptr!"));
+        UE_LOG(LogTemp, Error, TEXT("ARandomPlayer::OnTurn() - GField nullo."));
         return;
     }
+
+
 
     // Filtra le unità AI che non hanno ancora completato entrambe le azioni
     TArray<AGameUnit*> AIUnits;
     for (auto& Pair : GM->GField->GameUnitMap)
     {
         AGameUnit* Unit = Pair.Value;
-        // Includi l’unità se almeno una delle due azioni non è stata effettuata
         if (Unit && Unit->GetPlayerOwner() == 1 && !(Unit->bHasMoved && Unit->bHasAttacked))
         {
             AIUnits.Add(Unit);
@@ -46,7 +49,7 @@ void ARandomPlayer::OnTurn()
 
     if (AIUnits.Num() == 0)
     {
-        // Se tutte le unità hanno completato, passa il turno
+        // Se tutte le unità hanno completato le azioni, passa il turno
         GM->NextTurn();
         return;
     }
@@ -60,9 +63,16 @@ void ARandomPlayer::OnTurn()
 void ARandomPlayer::DoNextUnitAction()
 {
     AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
-    if (!GM) return;
+    if (!GM)
+    {
+        return;
+    }
 
     // Se abbiamo finito di processare le unità, passa il turno
+    while (SequenceIndex < UnitsSequence.Num() && !IsValid(UnitsSequence[SequenceIndex]))
+    {
+        SequenceIndex++;
+    }
     if (SequenceIndex >= UnitsSequence.Num())
     {
         UE_LOG(LogTemp, Log, TEXT("AI: Tutte le unità hanno completato le azioni. Passo il turno."));
@@ -78,58 +88,51 @@ void ARandomPlayer::DoNextUnitAction()
         return;
     }
 
-    // Mostra le opzioni legali (movimento e attacco) per l'unità corrente
-    UE_LOG(LogTemp, Warning, TEXT("Chiamato ShowLegalMovesForUnit per unità ID=%d"), CurrentUnit->GetGameUnitID());
-    if (GM->GField)
-    {
-        GM->GField->ShowLegalMovesForUnit(CurrentUnit);
-    }
+    // Mostra le tile di movimento (e attacco) per l'unità corrente
+    UE_LOG(LogTemp, Warning, TEXT("AI -> Mostro le tile per l'unità ID=%d"), CurrentUnit->GetGameUnitID());
+    GM->GField->ShowLegalMovesForUnit(CurrentUnit);
 
-    // Attendi 2 secondi per "visualizzare" le opzioni e poi esegui l'azione
-    FTimerHandle TimerHandle;
-    GetWorldTimerManager().SetTimer(
-        TimerHandle,
-        [this, CurrentUnit]()
+    // Aspetta un po' per dare tempo di visualizzare le tile (ad esempio 2 secondi)
+    FTimerHandle ShowTilesDelay;
+    GetWorldTimerManager().SetTimer(ShowTilesDelay, [this, CurrentUnit, GM]()
         {
-            // Esegui l'azione per la unità corrente
+            // Esegui l'azione casuale (muovi e/o attacca)
             PerformRandomActionOnUnit(CurrentUnit);
-
-            // Segna entrambe le azioni come completate
             CurrentUnit->bHasMoved = true;
             CurrentUnit->bHasAttacked = true;
 
-            // Passa alla prossima unità
-            SequenceIndex++;
-            DoNextUnitAction();
-        },
-        2.0f,
-        false
-    );
+            // Dopo che l'unità ha completato la sua azione, aspetta un ulteriore ritardo (ad esempio 1 secondo)
+            FTimerHandle NextUnitDelay;
+            GetWorldTimerManager().SetTimer(NextUnitDelay, [this, GM]()
+                {
+                    // Resetta le evidenziazioni (tile) e passa all'unità successiva
+                    GM->GField->ResetGameStatusField();
+                    SequenceIndex++;
+                    DoNextUnitAction();
+                }, 1.0f, false); // Ritardo aggiuntivo tra le azioni delle unità
+
+        }, 2.0f, false); // Ritardo iniziale per visualizzare le tile
 }
+
+
 
 void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
 {
-    if (!Unit)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("PerformRandomActionOnUnit: unità nulla."));
-        return;
-    }
+    if (!Unit) return;
 
     AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
-    if (!GM || !GM->GField)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("PerformRandomActionOnUnit: GameMode o GameField non trovati."));
-        return;
-    }
+    if (!GM || !GM->GField) return;
 
-    // Calcola le possibili mosse per il movimento
+    // ---------------------------------------------------------
+    // 1) Calcolo le possibili mosse di movimento
+    // ---------------------------------------------------------
     TArray<FVector2D> Moves = Unit->CalculateLegalMoves();
     TArray<FVector2D> ValidMoves;
     for (const FVector2D& MovePos : Moves)
     {
         if (GM->GField->IsValidPosition(MovePos))
         {
-            ATile* Tile = GM->GField->GetTileMap()[MovePos];
+            ATile* Tile = GM->GField->TileMap[MovePos];
             if (Tile && Tile->GetTileStatus() == ETileStatus::EMPTY)
             {
                 ValidMoves.Add(MovePos);
@@ -138,18 +141,20 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
     }
     bool bCanMove = (ValidMoves.Num() > 0);
 
-    // Calcola le possibili mosse di attacco
+    // ---------------------------------------------------------
+    // 2) Calcolo le possibili mosse di attacco
+    // ---------------------------------------------------------
     TArray<FVector2D> Attacks = Unit->CalculateAttackMoves();
     TArray<FVector2D> ValidAttacks;
     for (const FVector2D& AttackPos : Attacks)
     {
         if (GM->GField->IsValidPosition(AttackPos))
         {
-            ATile* Tile = GM->GField->GetTileMap()[AttackPos];
+            ATile* Tile = GM->GField->TileMap[AttackPos];
             if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
             {
                 AGameUnit* Target = Tile->GetGameUnit();
-                // Considera come bersaglio una unità nemica (playerOwner == 0)
+                // Nemico = PlayerOwner == 0
                 if (Target && Target->GetPlayerOwner() == 0)
                 {
                     ValidAttacks.Add(AttackPos);
@@ -159,85 +164,85 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
     }
     bool bCanAttack = (ValidAttacks.Num() > 0);
 
-    // Se entrambe le azioni sono possibili, "Muovi e poi Attacca"
+    // ---------------------------------------------------------
+    // 3) Decido l'azione: "Muovi e poi Attacca" / "Solo Muovi" / "Solo Attacca" / Nessuna
+    // ---------------------------------------------------------
     if (bCanMove && bCanAttack)
     {
-        UE_LOG(LogTemp, Log, TEXT("AI: Unità ID %d -> Muovi e poi Attacca"), Unit->GetGameUnitID());
-        FVector2D ChosenMove = ValidMoves[FMath::RandRange(0, ValidMoves.Num() - 1)];
+        UE_LOG(LogTemp, Log, TEXT("AI -> Unità ID %d: Muovi e poi Attacca"), Unit->GetGameUnitID());
+        FVector2D MoveChoice = ValidMoves[FMath::RandRange(0, ValidMoves.Num() - 1)];
 
-        // Muovo l’unità con callback
-        GM->GField->MoveUnit(Unit, ChosenMove, [GM, Unit, this]()
+        // Muovo con callback
+        GM->GField->MoveUnit(Unit, MoveChoice, [this, Unit, GM]()
             {
-                // (1) Dopo il movimento, resetto le tile verdi
+                // Subito dopo il movimento, resetto le tile di movimento
                 GM->GField->ResetGameStatusField();
 
-                // (2) Mostro le tile d'attacco (rosse) giusto per feedback visivo
+                // Mostro le tile di attacco
                 GM->GField->ShowLegalAttackOptionsForUnit(Unit);
 
-                // (3) Attendo un brevissimo delay prima di attaccare
-                FTimerHandle AttackTimer;
+                // Attendo un attimo per "visualizzare" le tile rosse
+                FTimerHandle AttackDelay;
                 GetWorld()->GetTimerManager().SetTimer(
-                    AttackTimer,
-                    [GM, Unit]()
+                    AttackDelay,
+                    [this, Unit, GM]()
                     {
-                        // Ricalcola possibili attacchi
-                        TArray<FVector2D> NewAttacks = Unit->CalculateAttackMoves();
-                        TArray<FVector2D> NewValidAttacks;
-                        for (const FVector2D& AttackPos : NewAttacks)
+                        // Ricalcolo i bersagli validi
+                        TArray<FVector2D> PostMoveAttacks = Unit->CalculateAttackMoves();
+                        TArray<FVector2D> PostMoveValid;
+                        for (const FVector2D& APos : PostMoveAttacks)
                         {
-                            if (GM->GField->IsValidPosition(AttackPos))
+                            if (GM->GField->IsValidPosition(APos))
                             {
-                                ATile* Tile = GM->GField->GetTileMap()[AttackPos];
-                                if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
+                                ATile* T = GM->GField->TileMap[APos];
+                                if (T && T->GetTileStatus() == ETileStatus::OCCUPIED)
                                 {
-                                    AGameUnit* Target = Tile->GetGameUnit();
+                                    AGameUnit* Target = T->GetGameUnit();
                                     if (Target && Target->GetPlayerOwner() == 0)
                                     {
-                                        NewValidAttacks.Add(AttackPos);
+                                        PostMoveValid.Add(APos);
                                     }
                                 }
                             }
                         }
-                        if (NewValidAttacks.Num() > 0)
+
+                        if (PostMoveValid.Num() > 0)
                         {
-                            FVector2D ChosenAttack = NewValidAttacks[FMath::RandRange(0, NewValidAttacks.Num() - 1)];
-                            GM->GField->AttackUnit(Unit, ChosenAttack);
+                            FVector2D AttackChoice = PostMoveValid[FMath::RandRange(0, PostMoveValid.Num() - 1)];
+                            GM->GField->AttackUnit(Unit, AttackChoice);
                         }
 
-                        // (4) A prescindere dall’esito, resetto le tile dopo l’attacco
+                        // Reset finale delle tile rosse
                         GM->GField->ResetGameStatusField();
                     },
-                    0.5f, // delay di 0.5 secondi
+                    0.5f, // 0.5 secondi
                     false
                 );
             });
     }
-    // Se solo attaccare è possibile
     else if (bCanAttack)
     {
-        UE_LOG(LogTemp, Log, TEXT("AI: Unità ID %d -> Solo Attacca"), Unit->GetGameUnitID());
-        FVector2D ChosenAttack = ValidAttacks[FMath::RandRange(0, ValidAttacks.Num() - 1)];
+        UE_LOG(LogTemp, Log, TEXT("AI -> Unità ID %d: Solo Attacca"), Unit->GetGameUnitID());
+        FVector2D AttackChoice = ValidAttacks[FMath::RandRange(0, ValidAttacks.Num() - 1)];
+        GM->GField->AttackUnit(Unit, AttackChoice);
 
-        GM->GField->AttackUnit(Unit, ChosenAttack);
-
-        // Subito dopo l’attacco, resetto le tile rosse
+        // Dopo l'attacco, resetto
         GM->GField->ResetGameStatusField();
     }
-    // Se solo muovere è possibile
     else if (bCanMove)
     {
-        UE_LOG(LogTemp, Log, TEXT("AI: Unità ID %d -> Solo Muovi"), Unit->GetGameUnitID());
-        FVector2D ChosenMove = ValidMoves[FMath::RandRange(0, ValidMoves.Num() - 1)];
+        UE_LOG(LogTemp, Log, TEXT("AI -> Unità ID %d: Solo Muovi"), Unit->GetGameUnitID());
+        FVector2D MoveChoice = ValidMoves[FMath::RandRange(0, ValidMoves.Num() - 1)];
 
-        // Muovo l'unità e poi resetto
-        GM->GField->MoveUnit(Unit, ChosenMove, [GM]()
+        // Muovo e poi resetto
+        GM->GField->MoveUnit(Unit, MoveChoice, [GM]()
             {
                 GM->GField->ResetGameStatusField();
             });
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("AI: Unità ID %d non può né muoversi né attaccare"), Unit->GetGameUnitID());
+        UE_LOG(LogTemp, Warning, TEXT("AI -> Unità ID %d non può né muoversi né attaccare."), Unit->GetGameUnitID());
     }
 }
 

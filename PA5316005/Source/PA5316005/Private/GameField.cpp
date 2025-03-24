@@ -266,25 +266,7 @@ TArray<FVector2D> AGameField::PossibleMoves(FVector2D Position) const
 }
 
 
-//TArray<FVector2D> AGameField::LegalMoves(FVector2D Position) const
-//{
-//	if (!IsValidPosition(Position) || (*TileMap.Find(Position))->GetTileOwner() == NOT_ASSIGNED)
-//	{
-//		return TArray<FVector2D>();
-//	}
-//
-//	TArray<FVector2D> PossibleMovesOfGameUnit = PossibleMoves(Position);
-//
-//	AAWGameMode* GameMode = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
-//
-//	for (int32 index = PossibleMovesOfGameUnit.Num() - 1; index >= 0; --index)
-//	{
-//		GameMode->DoMove(PossibleMovesOfGameUnit[index], false);
-//
-//	}
-//
-//	return PossibleMovesOfGameUnit;
-//}
+
 
 
 void AGameField::ShowLegalMovesInTheField()
@@ -531,6 +513,16 @@ void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 	{
 		UE_LOG(LogTemp, Log, TEXT("AttackUnit: Unit %d is destroyed"), Defender->GetGameUnitID());
 		TargetTile->SetTileStatus(AGameField::NOT_ASSIGNED, ETileStatus::EMPTY, nullptr);
+
+		// Rimuovi il difensore dalla mappa delle unità (potrebbe essere necessario iterare per trovare la chiave corrispondente)
+		for (auto It = GameUnitMap.CreateIterator(); It; ++It)
+		{
+			if (It.Value() == Defender)
+			{
+				It.RemoveCurrent();
+				break;
+			}
+		}
 		Defender->Destroy();
 	}
 

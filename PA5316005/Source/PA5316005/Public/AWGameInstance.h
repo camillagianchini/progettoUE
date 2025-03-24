@@ -35,11 +35,11 @@ public:
 	// ************ GETTERS ************
 	// Ritorna il punteggio del giocatore umano
 	UFUNCTION(BlueprintCallable)
-	int32 GetScoreHumanPlayer() const;
+	int32 GetScoreHumanPlayer();
 
 	// Ritorna il punteggio del giocatore AI
 	UFUNCTION(BlueprintCallable)
-	int32 GetScoreAiPlayer() const;
+	int32 GetScoreAiPlayer();
 
 	// Ritorna il messaggio corrente del turno
 	UFUNCTION(BlueprintCallable)
