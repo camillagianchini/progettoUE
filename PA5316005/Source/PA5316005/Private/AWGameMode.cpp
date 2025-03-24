@@ -200,7 +200,7 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
         }
         // Passa il turno al giocatore umano dopo il posizionamento dell'AI
         UE_LOG(LogTemp, Warning, TEXT("piazzare humanplayer!"));
-        CurrentPlayer = 0;
+        NextTurn();
     }
     else // Caso Human: il posizionamento umano viene gestito tramite l'input (click) in AHumanPlayer::OnClick()
     {
@@ -223,79 +223,53 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
 
 }
 
+int32 AAWGameMode::GetNextPlayer(int32 Player)
+{
+    // Avanza di 1
+    Player++;
+
+    // Se sforiamo l’ultimo indice, torniamo a 0
+    if (!Players.IsValidIndex(Player))
+    {
+        Player = 0;
+    }
+    return Player;
+}
+
 
 void AAWGameMode::NextTurn()
 {
-    // Controlla se ogni giocatore ha ancora unità attive
-    bool bHumanHasUnits = false;
-    bool bAIHasUnits = false;
-    for (auto& Pair : GField->GameUnitMap)
+    // Se vuoi contare i turni (opzionale)
+    MoveCounter++;
+
+    // Calcola chi è il prossimo
+    CurrentPlayer = GetNextPlayer(CurrentPlayer);
+
+    // Se siamo ancora in fase di Placement
+    if (CurrentPhase == EGamePhase::Placement)
     {
-        AGameUnit* Unit = Pair.Value;
-        if (IsValid(Unit))
+        // Chiama di nuovo PlaceUnitForCurrentPlayer()
+        // (così passa la mano all’altro e piazza la prossima unità)
+        PlaceUnitForCurrentPlayer();
+    }
+    else // Altrimenti siamo in Battle
+    {
+        // Se tocca all’AI
+        if (CurrentPlayer == 1)
         {
-            if (Unit->GetPlayerOwner() == 0)
+            if (ARandomPlayer* AI = Cast<ARandomPlayer>(Players[1]))
             {
-                bHumanHasUnits = true;
+                AI->OnTurn();
             }
-            else if (Unit->GetPlayerOwner() == 1)
+        }
+        else // Se tocca all’umano
+        {
+            if (AHumanPlayer* HP = Cast<AHumanPlayer>(Players[0]))
             {
-                bAIHasUnits = true;
+                HP->OnTurn();
             }
         }
     }
-
-    // Se il giocatore umano non ha unità, chiama OnLose sul giocatore umano
-    if (!bHumanHasUnits)
-    {
-        IPlayerInterface* HumanPlayer = Cast<IPlayerInterface>(Players[0]);
-        if (HumanPlayer)
-        {
-            HumanPlayer->OnLose();
-        }
-        EndGame(); // Funzione che ferma il gioco
-        return;
-    }
-    // Se l'AI non ha unità, chiama OnWin sul giocatore umano (vittoria umana)
-    else if (!bAIHasUnits)
-    {
-        IPlayerInterface* HumanPlayer = Cast<IPlayerInterface>(Players[0]);
-        if (HumanPlayer)
-        {
-            HumanPlayer->OnWin();
-        }
-        EndGame();
-        return;
-    }
-
-    // Alterna il turno (per il primo turno potresti mantenere il currentPlayer dal coin toss)
-    if (!bFirstTurn)
-    {
-        CurrentPlayer = 1 - CurrentPlayer;
-    }
-    else
-    {
-        bFirstTurn = false;
-    }
-
-    // Reset delle azioni per il nuovo giocatore
-    ResetActionsForPlayer(CurrentPlayer);
-
-    UE_LOG(LogTemp, Warning, TEXT("NextTurn() -> adesso CurrentPlayer = %d"), CurrentPlayer);
-
-    // Se è il turno dell'AI, chiama OnTurn() per l'AI; altrimenti l'input umano gestisce il turno
-    UAWGameInstance* GI = Cast<UAWGameInstance>(GetGameInstance());
-    if (CurrentPlayer == 1)
-    {
-        ARandomPlayer* AI = Cast<ARandomPlayer>(Players[1]);
-        if (AI)
-        {
-            AI->OnTurn();
-           
-            GI->SetTurnMessage("AI Turn");
-        }
-    }
-
 }
 
 

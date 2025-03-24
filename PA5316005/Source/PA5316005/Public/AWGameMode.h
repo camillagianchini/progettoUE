@@ -41,7 +41,7 @@ public:
     bool AllUnitsHaveActed(int32 Player);
     void ResetActionsForPlayer(int32 Player);
     void EndGame();
-
+    int32 GetNextPlayer(int32 Player);
 
 
     // Variabili di stato
