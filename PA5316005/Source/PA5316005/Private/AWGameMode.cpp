@@ -5,6 +5,7 @@
 #include "HumanPlayer.h"
 #include "RandomPlayer.h"
 #include "EngineUtils.h"
+#include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
 
 AAWGameMode::AAWGameMode()
@@ -46,6 +47,17 @@ AAWGameMode::AAWGameMode()
 void AAWGameMode::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (UnitListWidgetClass)
+    {
+        // Crei l'istanza del widget
+        UnitListWidget = CreateWidget<UUserWidget>(GetWorld(), UnitListWidgetClass);
+        if (UnitListWidget)
+        {
+            // Lo aggiungi allo schermo
+            UnitListWidget->AddToViewport();
+        }
+    }
 
     // Ottieni il riferimento al HumanPlayer (Pawn del primo PlayerController)
     AHumanPlayer* HumanPlayer = GetWorld()->GetFirstPlayerController()->GetPawn<AHumanPlayer>();

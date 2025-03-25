@@ -2,6 +2,7 @@
 #include "GameField.h"
 #include "AWGameMode.h"
 #include "GameField.h"
+#include "Blueprint/UserWidget.h"
 #include "UObject/ConstructorHelpers.h"
 
 int32 AGameUnit::NewGameUnitID = 0;
@@ -370,12 +371,72 @@ TArray<FVector2D> AGameUnit::CalculatePath(const FVector2D& EndPos)
 
 void AGameUnit::TakeDamageUnit(int32 DamageAmount)
 {
+	UE_LOG(LogTemp, Warning, TEXT("TakeDamageUnit: ID=%d, Danno=%d"), GetGameUnitID(), DamageAmount);
+
+	// Sottrai il danno
 	HitPoints -= DamageAmount;
 	if (HitPoints < 0)
 	{
 		HitPoints = 0;
 	}
+
+	// Determina il MaxHP in base al tipo di unità
+	const int32 MaxHP = (GameUnitType == EGameUnitType::SNIPER) ? 20 : 40;
+	UE_LOG(LogTemp, Warning, TEXT("TakeDamageUnit: ID=%d, HitPoints dopo = %d, MaxHP = %d"), GetGameUnitID(), HitPoints, MaxHP);
+	// Calcola la percentuale di vita [0..1]
+	const float HPPercent = (MaxHP > 0) ? static_cast<float>(HitPoints) / static_cast<float>(MaxHP) : 0.f;
+	UE_LOG(LogTemp, Warning, TEXT("TakeDamageUnit: ID=%d, HPPercent calcolato = %f"), GetGameUnitID(), HPPercent);
+
+	// Recupera il GameMode e, se esiste, il widget
+	AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+	if (GM && GM->UnitListWidget)
+	{
+		// Cast al widget base (UUserWidget)
+		UUserWidget* MyWidget = GM->UnitListWidget;
+		if (MyWidget)
+		{
+			// Cerchiamo l'evento "UpdateUnitHealth" definito come Custom Event in Blueprint
+			FName FunctionName("UpdateUnitHealth");
+			UFunction* Func = MyWidget->FindFunction(FunctionName);
+			if (Func)
+			{
+				struct FUpdateUnitHealthParams
+				{
+					bool bIsHuman;
+					uint8 UnitType;
+					float HPPercent;
+				};
+
+				FUpdateUnitHealthParams Params;
+				Params.bIsHuman = (PlayerOwner == 0);
+				Params.UnitType = static_cast<uint8>(GameUnitType);
+				Params.HPPercent = HPPercent;
+
+				MyWidget->ProcessEvent(Func, &Params);
+			}
+		}
+	}
+
+	// Se l'unità muore (HitPoints <= 0), rimuovila dalla griglia e distruggila
+	if (HitPoints <= 0)
+	{
+		if (GM && GM->GField)
+		{
+			FVector2D GridPos = GetGridPosition();
+			if (GM->GField->TileMap.Contains(GridPos))
+			{
+				ATile* Tile = GM->GField->TileMap[GridPos];
+				if (Tile)
+				{
+					Tile->SetTileStatus(-1, ETileStatus::EMPTY, nullptr);
+				}
+			}
+		}
+		Destroy();
+	}
 }
+
+
 
 bool AGameUnit::IsDead() const
 {

@@ -66,11 +66,11 @@ public:
     bool bFirstBattleTurn;
     bool bIsAITurnInProgress;
     // Dimensione del campo (griglia NxN)
-    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
     int32 FieldSize;
 
     // Mappe per il posizionamento delle unità per ciascun giocatore
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
     TMap<int32, bool> bSniperPlaced;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

@@ -492,7 +492,7 @@ void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 		return;
 	}
 
-	// Calcola le celle attaccabili dall'attaccante
+	// Verifica se TargetPos è effettivamente attaccabile dall'Attacker
 	TArray<FVector2D> PossibleAttacks = Attacker->CalculateAttackMoves();
 	if (!PossibleAttacks.Contains(TargetPos))
 	{
@@ -500,21 +500,22 @@ void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 		return;
 	}
 
-	// Calcola il danno in modo randomico tra DamageMin e DamageMax
+	// Calcola il danno casuale tra DamageMin e DamageMax dell'unità attaccante
 	int32 Damage = FMath::RandRange(Attacker->GetDamageMin(), Attacker->GetDamageMax());
 	UE_LOG(LogTemp, Log, TEXT("AttackUnit: Unit %d attacks unit %d for %d damage"),
 		Attacker->GetGameUnitID(), Defender->GetGameUnitID(), Damage);
 
-	// Applica il danno
+	// Sottrai i punti vita del difensore e aggiorna il widget (tramite TakeDamageUnit)
 	Defender->TakeDamageUnit(Damage);
 
-	// Se il difensore muore, rimuovilo dalla griglia
+	// Se il difensore muore, rimuovilo dalla griglia e distruggilo
 	if (Defender->IsDead())
 	{
 		UE_LOG(LogTemp, Log, TEXT("AttackUnit: Unit %d is destroyed"), Defender->GetGameUnitID());
+		// Libera la tile
 		TargetTile->SetTileStatus(AGameField::NOT_ASSIGNED, ETileStatus::EMPTY, nullptr);
 
-		// Rimuovi il difensore dalla mappa delle unità (potrebbe essere necessario iterare per trovare la chiave corrispondente)
+		// Rimuovi il difensore dalla mappa delle unità
 		for (auto It = GameUnitMap.CreateIterator(); It; ++It)
 		{
 			if (It.Value() == Defender)
@@ -526,7 +527,7 @@ void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 		Defender->Destroy();
 	}
 
-	// Se l’attaccante è uno Sniper, gestisci il contrattacco (se applicabile)
+	// Se l’attaccante è uno Sniper, gestisci il contrattacco (se le condizioni sono verificate)
 	if (Attacker->GetGameUnitType() == EGameUnitType::SNIPER)
 	{
 		ASniper* Sniper = Cast<ASniper>(Attacker);
@@ -536,6 +537,7 @@ void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 		}
 	}
 }
+
 
 void AGameField::ShowLegalMovesForUnit(AGameUnit* Unit)
 {
