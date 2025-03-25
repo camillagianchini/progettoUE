@@ -20,7 +20,7 @@ public:
     // RandomPlayer.h
     UPROPERTY()
     TArray<AGameUnit*> UnitsSequence;
-    
+
 
     int32 SequenceIndex;
 
@@ -29,5 +29,4 @@ private:
     void PerformRandomActionOnUnit(class AGameUnit* Unit);
     void DoNextUnitAction();
 };
-
 

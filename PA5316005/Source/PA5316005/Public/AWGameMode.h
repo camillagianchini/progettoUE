@@ -53,8 +53,18 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Turn Management")
     int32 StartingPlayer;
 
-    bool bFirstTurn;
+    // AAWGameMode.h
 
+// 1) Una variabile per la classe del widget
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> UnitListWidgetClass;
+
+    // 2) Una variabile per l'istanza creata a runtime
+    UPROPERTY()
+    UUserWidget* UnitListWidget;
+
+    bool bFirstBattleTurn;
+    bool bIsAITurnInProgress;
     // Dimensione del campo (griglia NxN)
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     int32 FieldSize;

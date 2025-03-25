@@ -70,7 +70,7 @@ void AHumanPlayer::OnWin()
 	if (GameInstance)
 	{
 		GameInstance->SetTurnMessage(TEXT("Human Wins!"));
-		GameInstance->IncrementScoreHumanPlayer();
+		
 	}
 }
 
@@ -197,6 +197,7 @@ void AHumanPlayer::OnClick()
 				UE_LOG(LogTemp, Log, TEXT("Tutte le unità posizionate. Passaggio alla fase di battaglia."));
 				// Imposta il CurrentPlayer sul valore del coin toss (StartingPlayer)
 				GM->CurrentPlayer = GM->StartingPlayer;
+				GM->NextTurn();
 			}
 			else
 			{
@@ -205,6 +206,7 @@ void AHumanPlayer::OnClick()
 				GM->NextTurn();
 			}
 		}
+
 		return;
 	}
 

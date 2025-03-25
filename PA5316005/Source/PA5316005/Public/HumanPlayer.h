@@ -56,8 +56,5 @@ public:
 	void DoNextUnitAction();
 
 
-	
+
 };
-
-
-

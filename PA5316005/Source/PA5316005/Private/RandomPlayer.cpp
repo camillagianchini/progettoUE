@@ -1,8 +1,12 @@
+
+
 #include "RandomPlayer.h"
 #include "AWGameMode.h"
 #include "GameField.h"
 #include "GameUnit.h"
 #include "AWGameInstance.h"
+#include "Kismet/GameplayStatics.h"
+
 #include "AWGameInstance.h"
 #include "EngineUtils.h"
 
@@ -34,7 +38,13 @@ void ARandomPlayer::OnTurn()
         return;
     }
 
-
+  
+        UAWGameInstance* GI = Cast<UAWGameInstance>(UGameplayStatics::GetGameInstance(GetWorld()));
+        if (GI)
+        {
+            GI->SetTurnMessage(TEXT("AI Turn"));
+        }
+    
 
     // Filtra le unità AI che non hanno ancora completato entrambe le azioni
     TArray<AGameUnit*> AIUnits;
@@ -245,10 +255,5 @@ void ARandomPlayer::PerformRandomActionOnUnit(AGameUnit* Unit)
         UE_LOG(LogTemp, Warning, TEXT("AI -> Unità ID %d non può né muoversi né attaccare."), Unit->GetGameUnitID());
     }
 }
-
-
-
-
-
 
 

@@ -7,7 +7,7 @@
 class AAWGameMode;
 class AGameField;
 
-UENUM()
+UENUM(BlueprintType)
 enum class EGameUnitType : uint8
 {
 	SNIPER UMETA(DisplayName = "Sniper"),

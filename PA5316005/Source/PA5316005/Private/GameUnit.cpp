@@ -145,29 +145,27 @@ int32 AGameUnit::GetDamageMax() const
 
 TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 {
-
 	TArray<FVector2D> Result;
-	if (!GameMode || !GameMode->GField)
+
+	// Recupera il GameMode
+	AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+	if (!GM || !GM->GField)
+	{
 		return Result;
-	
-	FVector2D StartPos = GetGridPosition();
+	}
 
-	//UE_LOG(LogTemp, Warning, TEXT("CalculateLegalMoves chiamato per unità ID=%d, StartPos=(%.0f, %.0f), MovementRange=%d"),
-		//tGameUnitID(), StartPos.X, StartPos.Y, MovementRange);
-
+	int32 FS = GM->FieldSize; // ecco la variabile locale FS che useremo come dimensione massima
 
 	// Strutture BFS
 	TQueue<FVector2D> Frontier;
 	TSet<FVector2D> Visited;
 	TMap<FVector2D, int32> DistMap;
 
+	Frontier.Enqueue(GetGridPosition());
+	Visited.Add(GetGridPosition());
+	DistMap.Add(GetGridPosition(), 0);
 
-	// Inserisci la cella di partenza manualmente, senza controllo
-	Frontier.Enqueue(StartPos);
-	Visited.Add(StartPos);
-	DistMap.Add(StartPos, 0);
-
-	// Direzioni verticali/orizzontali
+	// Direzioni di spostamento
 	static TArray<FVector2D> Dirs = {
 		FVector2D(1, 0), FVector2D(-1, 0),
 		FVector2D(0, 1), FVector2D(0, -1)
@@ -177,26 +175,25 @@ TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 	{
 		FVector2D Current;
 		Frontier.Dequeue(Current);
-		//UE_LOG(LogTemp, Warning, TEXT("BFS Current = (%.0f, %.0f), Dist = %d"),
-			//Current.X, Current.Y, DistMap[Current]);
 		int32 CurrentDist = DistMap[Current];
 
-		// Espandi nei 4 vicini
 		for (auto& Dir : Dirs)
 		{
 			FVector2D Next = Current + Dir;
+
+			// Controllo i confini in base a FS
+			if (Next.X < 0 || Next.X >= FS || Next.Y < 0 || Next.Y >= FS)
+			{
+				continue;
+			}
+
 			int32 NextDist = CurrentDist + 1;
 			if (NextDist <= MovementRange && !Visited.Contains(Next))
 			{
-				// Imposta il flag bIsStart: sarà true solo se Next è la cella di partenza
-				bool bIsStart = (Next == StartPos);
-				if (IsValidGridCell(Next, bIsStart))
+				// Se la cella è valida (non è un ostacolo o un'unità occupata, ecc.)
+				if (IsValidGridCell(Next, /*bIsStart*/ false))
 				{
-					// Aggiungi Next alle mosse se non è la cella di partenza
-					if (!bIsStart)
-					{
-						Result.Add(Next);
-					}
+					Result.Add(Next);
 					Frontier.Enqueue(Next);
 					Visited.Add(Next);
 					DistMap.Add(Next, NextDist);
@@ -204,8 +201,10 @@ TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 			}
 		}
 	}
+
 	return Result;
 }
+
 
 
 

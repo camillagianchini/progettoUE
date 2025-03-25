@@ -16,7 +16,7 @@ AAWGameMode::AAWGameMode()
     // Inizializza lo stato di gioco
     CurrentPlayer = 0;      // Di default il giocatore 0 (Human) inizia
     FieldSize = 25;         // Griglia 25x25
-    bFirstTurn = true;
+    bFirstBattleTurn = false;
 
     // Inizializza le mappe per il posizionamento delle unità per i due giocatori (0 e 1)
     bSniperPlaced.Add(0, false);
@@ -40,6 +40,7 @@ AAWGameMode::AAWGameMode()
     bIsGameOver = false;
     MoveCounter = 0;
     CurrentPhase = EGamePhase::Placement;
+    bIsAITurnInProgress = false;
 }
 
 void AAWGameMode::BeginPlay()
@@ -76,7 +77,7 @@ void AAWGameMode::BeginPlay()
     Players.Add(HumanPlayer);
     PlayerNames.Add(0, "Player");
 
-   
+
     auto* IA = GetWorld()->SpawnActor<ARandomPlayer>(FVector::ZeroVector, FRotator::ZeroRotator);
     Players.Add(IA);
     PlayerNames.Add(1, "IA");
@@ -102,6 +103,7 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
 {
     if (CurrentPlayer == 1) // Caso AI (RandomPlayer)
     {
+
         // Ottieni una tile libera casuale dal GameField
         ATile* RandomTile = GField->GetRandomFreeTile();
         if (RandomTile)
@@ -239,41 +241,78 @@ int32 AAWGameMode::GetNextPlayer(int32 Player)
 
 void AAWGameMode::NextTurn()
 {
-    // Se vuoi contare i turni (opzionale)
-    MoveCounter++;
-
-    // Calcola chi è il prossimo
-    CurrentPlayer = GetNextPlayer(CurrentPlayer);
-
-    // Se siamo ancora in fase di Placement
+    // Fase di Placement
     if (CurrentPhase == EGamePhase::Placement)
     {
-        // Chiama di nuovo PlaceUnitForCurrentPlayer()
-        // (così passa la mano all’altro e piazza la prossima unità)
-        PlaceUnitForCurrentPlayer();
+        bool bHumanDone = bSniperPlaced.FindRef(0) && bBrawlerPlaced.FindRef(0);
+        bool bAIDone = bSniperPlaced.FindRef(1) && bBrawlerPlaced.FindRef(1);
+        if (!(bHumanDone && bAIDone))
+        {
+            CurrentPlayer = GetNextPlayer(CurrentPlayer);
+            UE_LOG(LogTemp, Log, TEXT("Turno cambiato (placement). CurrentPlayer: %d"), CurrentPlayer);
+            PlaceUnitForCurrentPlayer();
+            return;
+        }
+        else
+        {
+            CurrentPhase = EGamePhase::Battle;
+            // Imposta il primo turno di battle senza alternare il giocatore
+            CurrentPlayer = StartingPlayer;
+            UE_LOG(LogTemp, Log, TEXT("Tutte le unità posizionate. Passaggio alla fase di battaglia."));
+            // Imposta un flag per indicare che è il primo turno di battle
+            bFirstBattleTurn = true;
+        }
     }
-    else // Altrimenti siamo in Battle
+
+    // Fase di Battle
+    if (CurrentPhase == EGamePhase::Battle)
     {
-        // Se tocca all’AI
+        if (bFirstBattleTurn)
+        {
+            // Il primo turno di battle: non alternare il CurrentPlayer, solo resetta le azioni
+            bFirstBattleTurn = false;
+        }
+        else
+        {
+            CurrentPlayer = GetNextPlayer(CurrentPlayer);
+        }
+
+        // Reset delle azioni per il giocatore corrente
+        ResetActionsForPlayer(CurrentPlayer);
+        UE_LOG(LogTemp, Log, TEXT("Turno cambiato (battle). CurrentPlayer: %d"), CurrentPlayer);
+
         if (CurrentPlayer == 1)
         {
-            if (ARandomPlayer* AI = Cast<ARandomPlayer>(Players[1]))
+            ARandomPlayer* AIPlayer = Cast<ARandomPlayer>(Players[1]);
+            if (AIPlayer)
             {
-                AI->OnTurn();
+                // Se l'AI è già in esecuzione, non farlo partire di nuovo
+                if (!bIsAITurnInProgress)
+                {
+                    bIsAITurnInProgress = true;
+                    AIPlayer->OnTurn();
+                }
+            }
+            else
+            {
+                UE_LOG(LogTemp, Error, TEXT("RandomPlayer non trovato in Players[1]!"));
             }
         }
-        else // Se tocca all’umano
+        else if (CurrentPlayer == 0)
         {
-            if (AHumanPlayer* HP = Cast<AHumanPlayer>(Players[0]))
+            bIsAITurnInProgress = false; // L'AI non sta eseguendo
+            AHumanPlayer* HumanPlayer = Cast<AHumanPlayer>(Players[0]);
+            if (HumanPlayer)
             {
-                HP->OnTurn();
+                HumanPlayer->OnTurn();
+            }
+            else
+            {
+                UE_LOG(LogTemp, Error, TEXT("HumanPlayer non trovato in Players[0]!"));
             }
         }
     }
 }
-
-
-
 
 
 
@@ -314,26 +353,3 @@ void AAWGameMode::EndGame()
     // Qui puoi aggiungere eventuale logica per terminare la partita,
     // come fermare i turni, mostrare un widget di fine partita, etc.
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
