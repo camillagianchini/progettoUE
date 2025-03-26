@@ -65,22 +65,7 @@ void AHumanPlayer::OnTurn()
 	}
 }
 
-void AHumanPlayer::OnWin()
-{
-	if (GameInstance)
-	{
-		GameInstance->SetTurnMessage(TEXT("Human Wins!"));
-		
-	}
-}
 
-void AHumanPlayer::OnLose()
-{
-	if (GameInstance)
-	{
-		GameInstance->SetTurnMessage(TEXT("Human Loses!"));
-	}
-}
 
 //////////////////////////////////////////////////////////////////////////
 // OnClick & Tile Interaction
@@ -90,6 +75,12 @@ void AHumanPlayer::OnClick()
 	if (!GM)
 	{
 		UE_LOG(LogTemp, Error, TEXT("OnClick: GameMode non trovato"));
+		return;
+	}
+
+	if (GM->bIsGameOver)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("La partita è finita, non puoi più muovere."));
 		return;
 	}
 

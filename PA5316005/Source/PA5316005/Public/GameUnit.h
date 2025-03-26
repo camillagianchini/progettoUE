@@ -157,8 +157,8 @@ public:
 
 
 
-	// Apply damage to the unit; if HitPoints reach 0, the unit is considered dead.
-	virtual void TakeDamageUnit(int32 DamageAmount);
+	UFUNCTION(BlueprintCallable)
+	void TakeDamageUnit(int32 DamageAmount, AGameUnit* Attacker = nullptr);
 
 	// Returns true if the unit is dead (HitPoints <= 0)
 	bool IsDead() const;

@@ -25,6 +25,5 @@ public:
 	int32 PlayerNumber;
 
 	virtual void OnTurn() {};
-	virtual void OnWin() {};
-	virtual void OnLose() {};
+
 };

@@ -31,9 +31,9 @@ public:
 
     virtual void BeginPlay() override;
 
-    // Funzioni per la fase di posizionamento
+    UFUNCTION(BlueprintCallable, Category = "Coin Toss")
     void CoinTossForStartingPlayer();
-    //void ChoosePlayerAndStartGame();
+    
     void PlaceUnitForCurrentPlayer();
 
     // Funzioni per la fase di battaglia
@@ -59,6 +59,11 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
     TSubclassOf<UUserWidget> UnitListWidgetClass;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<class UCoinTossWidget> CoinTossWidgetClass;
+
+    UPROPERTY()
+    UCoinTossWidget* CoinTossWidget;
     // 2) Una variabile per l'istanza creata a runtime
     UPROPERTY()
     UUserWidget* UnitListWidget;

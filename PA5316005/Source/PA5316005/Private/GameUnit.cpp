@@ -2,6 +2,7 @@
 #include "GameField.h"
 #include "AWGameMode.h"
 #include "GameField.h"
+#include "UnitListWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -369,70 +370,74 @@ TArray<FVector2D> AGameUnit::CalculatePath(const FVector2D& EndPos)
 
 
 
-void AGameUnit::TakeDamageUnit(int32 DamageAmount)
+// In GameUnit.cpp
+void AGameUnit::TakeDamageUnit(int32 DamageAmount, AGameUnit* Attacker)
 {
 	UE_LOG(LogTemp, Warning, TEXT("TakeDamageUnit: ID=%d, Danno=%d"), GetGameUnitID(), DamageAmount);
 
-	// Sottrai il danno
+	// 1) Sottraggo gli HP
 	HitPoints -= DamageAmount;
 	if (HitPoints < 0)
 	{
 		HitPoints = 0;
 	}
 
-	// Determina il MaxHP in base al tipo di unità
+	// 2) Determino i MaxHP in base al tipo (Sniper=20, Brawler=40)
 	const int32 MaxHP = (GameUnitType == EGameUnitType::SNIPER) ? 20 : 40;
-	UE_LOG(LogTemp, Warning, TEXT("TakeDamageUnit: ID=%d, HitPoints dopo = %d, MaxHP = %d"), GetGameUnitID(), HitPoints, MaxHP);
-	// Calcola la percentuale di vita [0..1]
-	const float HPPercent = (MaxHP > 0) ? static_cast<float>(HitPoints) / static_cast<float>(MaxHP) : 0.f;
-	UE_LOG(LogTemp, Warning, TEXT("TakeDamageUnit: ID=%d, HPPercent calcolato = %f"), GetGameUnitID(), HPPercent);
 
-	// Recupera il GameMode e, se esiste, il widget
-	AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
-	if (GM && GM->UnitListWidget)
+	// 3) Calcolo la percentuale di vita [0..1]
+	const float HPPercent = (MaxHP > 0) ? (float)HitPoints / (float)MaxHP : 0.f;
+	UE_LOG(LogTemp, Warning, TEXT("TakeDamageUnit: ID=%d, HitPoints=%d, HPPercent=%f"),
+		GetGameUnitID(), HitPoints, HPPercent);
+
+	// 4) Aggiorno l’interfaccia (widget) se presente
+	//    (Assumendo di avere AAWGameMode con un UUnitListWidget* UnitListWidget)
+	if (UUserWidget* BaseWidget = GameMode->UnitListWidget)
 	{
-		// Cast al widget base (UUserWidget)
-		UUserWidget* MyWidget = GM->UnitListWidget;
+		UUnitListWidget* MyWidget = Cast<UUnitListWidget>(BaseWidget);
 		if (MyWidget)
 		{
-			// Cerchiamo l'evento "UpdateUnitHealth" definito come Custom Event in Blueprint
-			FName FunctionName("UpdateUnitHealth");
-			UFunction* Func = MyWidget->FindFunction(FunctionName);
-			if (Func)
-			{
-				struct FUpdateUnitHealthParams
-				{
-					bool bIsHuman;
-					uint8 UnitType;
-					float HPPercent;
-				};
-
-				FUpdateUnitHealthParams Params;
-				Params.bIsHuman = (PlayerOwner == 0);
-				Params.UnitType = static_cast<uint8>(GameUnitType);
-				Params.HPPercent = HPPercent;
-
-				MyWidget->ProcessEvent(Func, &Params);
-			}
+			MyWidget->UpdateUnitHealth((PlayerOwner == 0),
+				GameUnitType,
+				HPPercent);
 		}
 	}
 
-	// Se l'unità muore (HitPoints <= 0), rimuovila dalla griglia e distruggila
+	// 5) Se la nostra unità è appena morta, rimuovila e basta
+	//    (così eviti di fare contrattacchi inutili se siamo a 0 HP)
 	if (HitPoints <= 0)
 	{
-		if (GM && GM->GField)
+		UE_LOG(LogTemp, Warning, TEXT("Unit ID=%d è morta."), GetGameUnitID());
+
+		// Rimuovo dalla griglia
+		if (AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode()))
 		{
-			FVector2D GridPos = GetGridPosition();
-			if (GM->GField->TileMap.Contains(GridPos))
+			if (GM->GField)
 			{
-				ATile* Tile = GM->GField->TileMap[GridPos];
-				if (Tile)
+				const FVector2D MyPos = GetGridPosition();
+				if (ATile* Tile = GM->GField->TileMap.FindRef(MyPos))
 				{
 					Tile->SetTileStatus(-1, ETileStatus::EMPTY, nullptr);
 				}
 			}
 		}
+		// Distruggo l’attore
 		Destroy();
+		return;
+	}
+
+	// 6) Se NON siamo morti e l'Attacker è valido, controlliamo il contrattacco.
+	//    Dato che tu hai la funzione "ASniper::HandleCounterAttack(AGameUnit* AttackedUnit)"
+	//    che parte dal punto di vista del *Sniper*, basta:
+	if (Attacker && Attacker->GetGameUnitType() == EGameUnitType::SNIPER)
+	{
+		// Cast a ASniper
+		if (ASniper* TheSniper = Cast<ASniper>(Attacker))
+		{
+			// Chiediamo al *loro* Sniper di "gestire" il contrattacco contro *this*.
+			// (Nella tua HandleCounterAttack, "AttackedUnit" = la vittima del contrattacco, cioè "this".)
+			TheSniper->HandleCounterAttack(this);
+		}
 	}
 }
 

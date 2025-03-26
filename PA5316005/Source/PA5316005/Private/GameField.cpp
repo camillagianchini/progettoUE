@@ -525,7 +525,29 @@ void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 			}
 		}
 		Defender->Destroy();
+
+		// Controlla se il giocatore proprietario del difensore ha ancora unità nella mappa
+		bool bUnitsLeft = false;
+		for (auto& UnitPair : GameUnitMap)
+		{
+			if (UnitPair.Value && UnitPair.Value->GetPlayerOwner() == Defender->GetPlayerOwner())
+			{
+				bUnitsLeft = true;
+				break;
+			}
+		}
+
+		if (!bUnitsLeft)
+		{
+			AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+			if (GM)
+			{
+				GM->EndGame();  // EndGame() gestirà il messaggio "Human wins!" o "AI wins!" a seconda di chi ha perso
+			}
+		}
 	}
+
+
 
 	// Se l’attaccante è uno Sniper, gestisci il contrattacco (se le condizioni sono verificate)
 	if (Attacker->GetGameUnitType() == EGameUnitType::SNIPER)

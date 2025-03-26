@@ -5,6 +5,7 @@
 #include "HumanPlayer.h"
 #include "RandomPlayer.h"
 #include "EngineUtils.h"
+#include "CoinTossWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -47,6 +48,15 @@ AAWGameMode::AAWGameMode()
 void AAWGameMode::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (CoinTossWidgetClass)
+    {
+        CoinTossWidget = CreateWidget<UCoinTossWidget>(GetWorld(), CoinTossWidgetClass);
+        if (CoinTossWidget)
+        {
+            CoinTossWidget->AddToViewport();
+        }
+    }
 
     if (UnitListWidgetClass)
     {
@@ -95,20 +105,42 @@ void AAWGameMode::BeginPlay()
     PlayerNames.Add(1, "IA");
 
     // Esegui il coin toss per decidere chi inizia a posizionare le unità
-    CoinTossForStartingPlayer();
+   // CoinTossForStartingPlayer();
 }
 
 void AAWGameMode::CoinTossForStartingPlayer()
 {
+
+
     // Genera un numero casuale 0 o 1 per decidere chi inizia
     int32 CoinResult = FMath::RandRange(0, 1);
-    StartingPlayer = CoinResult; // salva in una variabile di AAWGameMode
+    StartingPlayer = CoinResult;
     CurrentPlayer = CoinResult;
     UE_LOG(LogTemp, Log, TEXT("Coin toss result: %d. Starting player is: %d"), CoinResult, CurrentPlayer);
 
-    // Avvia la fase di posizionamento
-    PlaceUnitForCurrentPlayer();
+    // Aggiorna il widget
+    if (CoinTossWidget)
+    {
+        if (CoinResult == 0)
+        {
+            CoinTossWidget->SetCoinTossResult(TEXT("Human starts!"));
+        }
+        else
+        {
+            CoinTossWidget->SetCoinTossResult(TEXT("AI starts!"));
+        }
+        // Rimuovi o disabilita il widget (oppure il bottone all'interno)
+        CoinTossWidget->RemoveFromParent();
+    }
+
+    // Aggiungi un ritardo prima di posizionare l'unità
+    float DelayBeforePlacement = 2.0f; // ad esempio 2 secondi
+    FTimerHandle TimerHandle;
+    GetWorldTimerManager().SetTimer(TimerHandle, this, &AAWGameMode::PlaceUnitForCurrentPlayer, DelayBeforePlacement, false);
 }
+
+
+
 
 
 void AAWGameMode::PlaceUnitForCurrentPlayer()
@@ -253,6 +285,11 @@ int32 AAWGameMode::GetNextPlayer(int32 Player)
 
 void AAWGameMode::NextTurn()
 {
+    if (bIsGameOver)
+    {
+        return;
+    }
+
     // Fase di Placement
     if (CurrentPhase == EGamePhase::Placement)
     {
@@ -361,7 +398,62 @@ void AAWGameMode::ResetActionsForPlayer(int32 Player)
 
 void AAWGameMode::EndGame()
 {
-    UE_LOG(LogTemp, Log, TEXT("EndGame() chiamato. La partita è terminata."));
-    // Qui puoi aggiungere eventuale logica per terminare la partita,
-    // come fermare i turni, mostrare un widget di fine partita, etc.
+    bIsGameOver = true;
+
+    bool bHumanUnitsRemaining = false;
+    bool bAIUnitsRemaining = false;
+
+    // Itera sulla mappa delle unità per verificare se ci sono unità per ciascun giocatore.
+    for (auto& UnitPair : GField->GameUnitMap)
+    {
+        if (UnitPair.Value)
+        {
+            if (UnitPair.Value->GetPlayerOwner() == 0)
+            {
+                bHumanUnitsRemaining = true;
+            }
+            else if (UnitPair.Value->GetPlayerOwner() == 1)
+            {
+                bAIUnitsRemaining = true;
+            }
+        }
+    }
+
+    // Assumendo che l'array dei player sia memorizzato in "Players"
+    for (AActor* PlayerActor : Players)
+    {
+
+
+        // Puoi anche aggiornare il messaggio sullo schermo usando il GameInstance, ad esempio:
+        UAWGameInstance* GI = Cast<UAWGameInstance>(UGameplayStatics::GetGameInstance(GetWorld()));
+        if (GI)
+        {
+            if (bHumanUnitsRemaining && !bAIUnitsRemaining)
+            {
+                GEngine->AddOnScreenDebugMessage(
+                    -1,
+                    10.f,
+                    FColor::Green,
+                    TEXT("HUMAN WINS!"),
+                    true,
+                    FVector2D(2.f, 2.f) // Scala più grande
+                );
+            }
+            else if (!bHumanUnitsRemaining && bAIUnitsRemaining)
+            {
+                GEngine->AddOnScreenDebugMessage(
+                    -1,             // key
+                    10.f,           // durata
+                    FColor::Green,  // colore
+                    TEXT("AI WINS!"),
+                    /*bNewerOnTop*/ true,
+                    FVector2D(2.f, 2.f)  // scala (x, y)
+                );
+            }
+
+
+
+        }
+    }
 }
+
