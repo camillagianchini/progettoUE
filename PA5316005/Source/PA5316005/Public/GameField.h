@@ -95,6 +95,14 @@ public:
 
 	void GenerateLettersAndNumbers(int32 X, int32 Y);
 
+	static FString ConvertGridPosToCellString(const FVector2D& Pos)
+	{
+		char Letter = 'A' + static_cast<int>(Pos.X);
+		int32 Row = static_cast<int>(Pos.Y) + 1;
+		return FString::Printf(TEXT("%c%d"), Letter, Row);
+	}
+
+
 	template<typename T>
 	void GenerateGameUnit(FVector2D Position, int32 Player);
 

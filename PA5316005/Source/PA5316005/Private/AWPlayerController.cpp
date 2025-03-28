@@ -1,8 +1,11 @@
 #include "AWPlayerController.h"
 #include "HumanPlayer.h"  // Assicurati che il percorso corrisponda
+#include "CoinTossWidget.h"
+
 #include "Components/InputComponent.h"
 #include "InputMappingContext.h"
 
+class AWGameMode;
 
 AAWPlayerController::AAWPlayerController()
 {
@@ -36,9 +39,6 @@ void AAWPlayerController::BeginPlay()
         UE_LOG(LogTemp, Warning, TEXT("Subsystem not found!"));
     }
 
-    // Imposta l'Input Mode per il gioco
-    FInputModeGameOnly InputMode;
-    SetInputMode(InputMode);
 }
 
 
@@ -47,14 +47,6 @@ void AAWPlayerController::SetupInputComponent()
 {
     Super::SetupInputComponent();
 
-    if (!ClickAction)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("ClickAction è nullptr! Assicurati di assegnarlo nell'editor."));
-    }
-    else
-    {
-        //UE_LOG(LogTemp, Log, TEXT("ClickAction assegnato: %s"), *ClickAction->GetName());
-    }
 
     if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(InputComponent))
     {
@@ -67,16 +59,19 @@ void AAWPlayerController::SetupInputComponent()
 
 void AAWPlayerController::ClickOnGrid()
 {
-    //UE_LOG(LogTemp, Warning, TEXT("ClickOnGrid() triggered!"));
-    if (AHumanPlayer* HumanPlayer = Cast<AHumanPlayer>(GetPawn()))
+    AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+    if (GM->bCoinTossActive)  // oppure un check su un widget, su un bool, ecc.
     {
-        //UE_LOG(LogTemp, Warning, TEXT("Trovato HumanPlayer!"));
+        UE_LOG(LogTemp, Warning, TEXT("Ignoro il click, coin toss attivo"));
+        return;
+    }
+
+    const auto HumanPlayer = Cast<AHumanPlayer>(GetPawn());
+    if (IsValid(HumanPlayer))
+    {
         HumanPlayer->OnClick();
     }
-    else
-    {
-        //UE_LOG(LogTemp, Warning, TEXT("Il Pawn posseduto non è un HumanPlayer."));
-    }
+
 }
 
 

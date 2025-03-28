@@ -71,6 +71,7 @@ void AHumanPlayer::OnTurn()
 // OnClick & Tile Interaction
 void AHumanPlayer::OnClick()
 {
+	
 	AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
 	if (!GM)
 	{
@@ -113,7 +114,7 @@ void AHumanPlayer::OnClick()
 	}
 
 	// Fase di Placement: l'umano piazza le unità tramite click
-	if (GM->CurrentPhase != EGamePhase::Battle)
+	if (GM->CurrentPhase == EGamePhase::Placement)
 	{
 		if (ClickedTile->GetTileStatus() != ETileStatus::EMPTY)
 		{
@@ -177,27 +178,13 @@ void AHumanPlayer::OnClick()
 			}
 		}
 
-		// Se un'unità è stata piazzata, controlla se tutte le unità sono state posizionate
-		if (bPlacedUnit)
+	 if (bPlacedUnit)
 		{
-			bool bHumanDone = GM->bSniperPlaced.FindRef(0) && GM->bBrawlerPlaced.FindRef(0);
-			bool bAIDone = GM->bSniperPlaced.FindRef(1) && GM->bBrawlerPlaced.FindRef(1);
-			if (bHumanDone && bAIDone)
-			{
-				GM->CurrentPhase = EGamePhase::Battle;
-				UE_LOG(LogTemp, Log, TEXT("Tutte le unità posizionate. Passaggio alla fase di battaglia."));
-				// Imposta il CurrentPlayer sul valore del coin toss (StartingPlayer)
-				GM->CurrentPlayer = GM->StartingPlayer;
-				GM->NextTurn();
-			}
-			else
-			{
-				// Passa il turno al posizionamento dell'AI
-				UE_LOG(LogTemp, Log, TEXT("Passaggio del turno all'AI (placement)."));
-				GM->NextTurn();
-			}
+			GM->GField->ResetGameStatusField();
+			GM->SelectedUnit = nullptr;
+			// Chiamata unica a NextTurn() (NextTurn() gestirà il passaggio alla fase Battle se necessario)
+			GM->NextTurn();
 		}
-
 		return;
 	}
 
@@ -240,6 +227,7 @@ void AHumanPlayer::OnClick()
 			GameMode->GField->MoveUnit(SelectedUnit, TilePos, [this, SelectedUnit, TilePos]()
 				{
 					SelectedUnit->bHasMoved = true;
+
 					UE_LOG(LogTemp, Log, TEXT("Unità ID=%d mossa in X=%.0f Y=%.0f"), SelectedUnit->GetGameUnitID(), TilePos.X, TilePos.Y);
 					GameMode->GField->ResetGameStatusField();
 
@@ -354,7 +342,10 @@ void AHumanPlayer::DoNextUnitAction()
 	for (auto& Pair : GameMode->GField->GameUnitMap)
 	{
 		AGameUnit* Unit = Pair.Value;
-		if (Unit && Unit->GetPlayerOwner() == 0 && !(Unit->bHasMoved && Unit->bHasAttacked))
+		if (Unit
+			&& Unit->GetPlayerOwner() == 0
+			&& !Unit->IsDead()                               // <--- AGGIUNTO
+			&& !(Unit->bHasMoved && Unit->bHasAttacked))
 		{
 			NextUnit = Unit;
 			break;

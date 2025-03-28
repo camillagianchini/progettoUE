@@ -3,7 +3,8 @@
 #include "GameUnit.h"
 #include "Sniper.h"
 #include "Brawler.h"
-//#include "MovesPanel.h"
+#include "MovesPanel.h"
+#include "MoveHistoryWidget.h"
 #include "AWGameMode.h"
 #include "Components/TextRenderComponent.h"
 
@@ -406,9 +407,11 @@ void AGameField::MoveUnit(AGameUnit* Unit, const FVector2D& NewPos, TFunction<vo
 	TSharedPtr<int32> CurrentStepPtr = MakeShared<int32>(0);
 	TSharedPtr<FTimerHandle> TimerHandlePtr = MakeShared<FTimerHandle>();
 
-	// Crea una lambda che gestisce il movimento step-by-step
+	
+
+	// ...
 	FTimerDelegate TimerDelegate;
-	TimerDelegate.BindLambda([this, Unit, PathPtr, NewPos, CurrentStepPtr, TimerHandlePtr, OnMovementFinished]() mutable
+	TimerDelegate.BindLambda([this, Unit, PathPtr, StartPos, NewPos, CurrentStepPtr, TimerHandlePtr, OnMovementFinished]() mutable
 		{
 			// Se l'unità è stata distrutta, ferma il timer
 			if (!Unit || !Unit->IsValidLowLevel())
@@ -436,12 +439,25 @@ void AGameField::MoveUnit(AGameUnit* Unit, const FVector2D& NewPos, TFunction<vo
 						DestTile->SetTileStatus(Unit->GetPlayerOwner(), ETileStatus::OCCUPIED, Unit);
 					}
 					Unit->SetGridPosition(NewPos.X, NewPos.Y);
-
+					FGameMove NewMove;
+					NewMove.PlayerID = (Unit->GetPlayerOwner() == 0) ? TEXT("HP") : TEXT("AI");
+					NewMove.UnitType = (Unit->GetGameUnitType() == EGameUnitType::SNIPER) ? TEXT("S") : TEXT("B");
+					NewMove.FromCell = ConvertGridPosToCellString(StartPos);
+					NewMove.ToCell = ConvertGridPosToCellString(NewPos);
+					NewMove.bIsAttack = false;
+					
+					AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+					// Aggiungi la mossa allo storico se il MovesPanel esiste
+					if (GM && GM->MovesPanel)
+					{
+						GM->MovesPanel->AddMoveToPanel(NewMove);
+					}
 					// Movimento completato: chiama il callback se esiste
 					if (OnMovementFinished)
 					{
 						OnMovementFinished();
 					}
+					
 				}
 
 				// Incrementa l'indice per il prossimo step
@@ -505,6 +521,23 @@ void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 	UE_LOG(LogTemp, Log, TEXT("AttackUnit: Unit %d attacks unit %d for %d damage"),
 		Attacker->GetGameUnitID(), Defender->GetGameUnitID(), Damage);
 
+	FGameMove AttackMove;
+	AttackMove.PlayerID = (Attacker->GetPlayerOwner() == 0) ? TEXT("HP") : TEXT("AI");
+	AttackMove.UnitType = (Attacker->GetGameUnitType() == EGameUnitType::SNIPER) ? TEXT("S") : TEXT("B");
+	// Converti la posizione in una notazione a tua scelta (ad esempio "A1")
+	// Puoi implementare una funzione di utilità come ConvertToCellNotation(TargetPos)
+	AttackMove.TargetCell = ConvertGridPosToCellString(TargetPos);
+	AttackMove.Damage = Damage;
+	AttackMove.bIsAttack = true;
+
+
+	AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+	// Aggiungi la mossa allo storico se il MovesPanel esiste
+	if (GM && GM->MovesPanel)
+	{
+		GM->MovesPanel->AddMoveToPanel(AttackMove);
+	}
+
 	// Sottrai i punti vita del difensore e aggiorna il widget (tramite TakeDamageUnit)
 	Defender->TakeDamageUnit(Damage);
 
@@ -539,7 +572,7 @@ void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 
 		if (!bUnitsLeft)
 		{
-			AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
+			
 			if (GM)
 			{
 				GM->EndGame();  // EndGame() gestirà il messaggio "Human wins!" o "AI wins!" a seconda di chi ha perso
@@ -563,12 +596,13 @@ void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 
 void AGameField::ShowLegalMovesForUnit(AGameUnit* Unit)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Chiamato ShowLegalMovesForUnit"));
-	if (!Unit)
+	if (Unit->IsDead())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ShowLegalMovesForUnit: Unità nulla."));
+		UE_LOG(LogTemp, Warning, TEXT("ShowLegalMovesForUnit: Unit morta!"));
 		return;
 	}
+
+
 
 	AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
 	if (!GM || !GM->GField)

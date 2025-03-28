@@ -6,6 +6,8 @@
 #include "RandomPlayer.h"
 #include "EngineUtils.h"
 #include "CoinTossWidget.h"
+#include "MovesPanel.h"
+
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -43,31 +45,58 @@ AAWGameMode::AAWGameMode()
     MoveCounter = 0;
     CurrentPhase = EGamePhase::Placement;
     bIsAITurnInProgress = false;
+
+ 
+
 }
 
 void AAWGameMode::BeginPlay()
 {
     Super::BeginPlay();
-
+    
     if (CoinTossWidgetClass)
     {
         CoinTossWidget = CreateWidget<UCoinTossWidget>(GetWorld(), CoinTossWidgetClass);
         if (CoinTossWidget)
         {
+            // Ti sottoscrivi all’evento OnCoinTossCompleted
+            CoinTossWidget->OnCoinTossCompleted.AddDynamic(this, &AAWGameMode::CoinTossForStartingPlayer);
+
             CoinTossWidget->AddToViewport();
+
+            FInputModeGameAndUI InputMode;
+            // Mettiamo il focus sul widget stesso
+            InputMode.SetWidgetToFocus(CoinTossWidget->TakeWidget());
+            InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+            GetWorld()->GetFirstPlayerController()->SetInputMode(InputMode);
+
+            // Mostriamo il cursore
+            GetWorld()->GetFirstPlayerController()->bShowMouseCursor = true;
+            // Imposti bCoinTossActive a true
+            bCoinTossActive = true;
+
+        }
+    }
+    // In AAWGameMode::BeginPlay()
+    if (MovesPanelClass)
+    {
+        MovesPanel = CreateWidget<UMovesPanel>(GetWorld(), MovesPanelClass);
+        if (MovesPanel)
+        {
+            MovesPanel->AddToViewport();
         }
     }
 
+
     if (UnitListWidgetClass)
     {
-        // Crei l'istanza del widget
         UnitListWidget = CreateWidget<UUserWidget>(GetWorld(), UnitListWidgetClass);
         if (UnitListWidget)
         {
-            // Lo aggiungi allo schermo
             UnitListWidget->AddToViewport();
         }
     }
+
 
     // Ottieni il riferimento al HumanPlayer (Pawn del primo PlayerController)
     AHumanPlayer* HumanPlayer = GetWorld()->GetFirstPlayerController()->GetPawn<AHumanPlayer>();
@@ -76,6 +105,17 @@ void AAWGameMode::BeginPlay()
         UE_LOG(LogTemp, Error, TEXT("No player of type '%s' was found."), *AHumanPlayer::StaticClass()->GetName());
         return;
     }
+
+
+    // Aggiungi i giocatori: HumanPlayer (indice 0) e AI (indice 1)
+    Players.Add(HumanPlayer);
+    PlayerNames.Add(0, "Human");
+
+
+    auto* IA = GetWorld()->SpawnActor<ARandomPlayer>(FVector::ZeroVector, FRotator::ZeroRotator);
+    Players.Add(IA);
+    PlayerNames.Add(1, "IA");
+
 
     // Spawn del GameField
     if (GameFieldClass != nullptr)
@@ -95,49 +135,48 @@ void AAWGameMode::BeginPlay()
     FRotator CameraRot(-90.0f, 0.0f, 0.0f);
     HumanPlayer->SetActorLocationAndRotation(CameraPos, CameraRot);
 
-    // Aggiungi i giocatori: HumanPlayer (indice 0) e AI (indice 1)
-    Players.Add(HumanPlayer);
-    PlayerNames.Add(0, "Player");
 
-
-    auto* IA = GetWorld()->SpawnActor<ARandomPlayer>(FVector::ZeroVector, FRotator::ZeroRotator);
-    Players.Add(IA);
-    PlayerNames.Add(1, "IA");
-
-    // Esegui il coin toss per decidere chi inizia a posizionare le unità
-   // CoinTossForStartingPlayer();
 }
 
-void AAWGameMode::CoinTossForStartingPlayer()
+// Aggiungi un parametro per ricevere il risultato
+void AAWGameMode::CoinTossForStartingPlayer(int32 CoinResult)
 {
+    bCoinTossActive = false;
 
-
-    // Genera un numero casuale 0 o 1 per decidere chi inizia
-    int32 CoinResult = FMath::RandRange(0, 1);
+    // Se CoinResult == 0 => Human inizia, altrimenti AI
     StartingPlayer = CoinResult;
     CurrentPlayer = CoinResult;
-    UE_LOG(LogTemp, Log, TEXT("Coin toss result: %d. Starting player is: %d"), CoinResult, CurrentPlayer);
 
-    // Aggiorna il widget
+    UE_LOG(LogTemp, Warning, TEXT("Coin toss concluso, esito: %d"), CoinResult);
+
+    // Se il widget è valido, lo rimango visibile per 2 secondi prima di rimuoverlo
     if (CoinTossWidget)
     {
-        if (CoinResult == 0)
-        {
-            CoinTossWidget->SetCoinTossResult(TEXT("Human starts!"));
-        }
-        else
-        {
-            CoinTossWidget->SetCoinTossResult(TEXT("AI starts!"));
-        }
-        // Rimuovi o disabilita il widget (oppure il bottone all'interno)
-        CoinTossWidget->RemoveFromParent();
+        FTimerHandle TimerHandle;
+        GetWorldTimerManager().SetTimer(TimerHandle, [this]()
+            {
+                if (CoinTossWidget)
+                {
+                    CoinTossWidget->RemoveFromParent();
+                    CoinTossWidget = nullptr;
+                    FInputModeGameOnly GameOnlyMode;
+                    GetWorld()->GetFirstPlayerController()->SetInputMode(GameOnlyMode);
+                    // Se vuoi ancora il cursore visibile in gioco, rimetti bShowMouseCursor = true;
+                    // Oppure false, se preferisci che sparisca
+                    GetWorld()->GetFirstPlayerController()->bShowMouseCursor = true;
+                }
+                // Dopo la rimozione, procedo col posizionamento delle unità
+                PlaceUnitForCurrentPlayer();
+            }, 2.0f, false);
     }
-
-    // Aggiungi un ritardo prima di posizionare l'unità
-    float DelayBeforePlacement = 2.0f; // ad esempio 2 secondi
-    FTimerHandle TimerHandle;
-    GetWorldTimerManager().SetTimer(TimerHandle, this, &AAWGameMode::PlaceUnitForCurrentPlayer, DelayBeforePlacement, false);
+    else
+    {
+        // Se il widget non è valido, procedo subito
+        PlaceUnitForCurrentPlayer();
+    }
 }
+
+
 
 
 
@@ -299,9 +338,12 @@ void AAWGameMode::NextTurn()
         {
             CurrentPlayer = GetNextPlayer(CurrentPlayer);
             UE_LOG(LogTemp, Log, TEXT("Turno cambiato (placement). CurrentPlayer: %d"), CurrentPlayer);
+            SelectedUnit = nullptr;
             PlaceUnitForCurrentPlayer();
             return;
         }
+
+
         else
         {
             CurrentPhase = EGamePhase::Battle;
@@ -310,9 +352,9 @@ void AAWGameMode::NextTurn()
             UE_LOG(LogTemp, Log, TEXT("Tutte le unità posizionate. Passaggio alla fase di battaglia."));
             // Imposta un flag per indicare che è il primo turno di battle
             bFirstBattleTurn = true;
+           
         }
     }
-
     // Fase di Battle
     if (CurrentPhase == EGamePhase::Battle)
     {
@@ -361,6 +403,7 @@ void AAWGameMode::NextTurn()
             }
         }
     }
+
 }
 
 

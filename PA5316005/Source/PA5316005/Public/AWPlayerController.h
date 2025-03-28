@@ -16,10 +16,8 @@ public:
 
 	AAWPlayerController();
 
-protected:
-	virtual void BeginPlay() override;
 
-public:
+
 	// Input mapping context per il gioco a turni
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputMappingContext* AWContext;
@@ -33,5 +31,9 @@ public:
 
 protected:
 	virtual void SetupInputComponent() override;
+
+	virtual void BeginPlay() override;
+
+
 };
 

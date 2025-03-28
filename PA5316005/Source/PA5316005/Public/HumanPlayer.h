@@ -23,8 +23,11 @@ protected:
 	// Chiamato all’avvio del gioco o quando spawnato
 	virtual void BeginPlay() override;
 	bool IsMyTurn = false;
+	// Nella classe HumanPlayer, aggiungi una variabile membro:
+
 
 public:
+	
 	// Chiamato ogni frame
 	virtual void Tick(float DeltaTime) override;
 
