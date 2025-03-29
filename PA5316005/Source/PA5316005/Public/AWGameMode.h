@@ -59,7 +59,9 @@ class AGameField;
 class UMovesPanel;
 class AHumanPlayer;
 class ARandomPlayer;
+class AAStarPlayer;
 class UCoinTossWidget;
+class UOpponentSelectionWidget;
 
 UCLASS()
 class PA5316005_API AAWGameMode : public AGameModeBase
@@ -83,7 +85,26 @@ public:
     void EndGame();
     int32 GetNextPlayer(int32 Player);
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Unit Classes|AStar")
+    TSubclassOf<ASniper> AStarSniperClass;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Unit Classes|AStar")
+    TSubclassOf<ABrawler> AStarBrawlerClass;
+
+
+    UFUNCTION(BlueprintCallable, Category = "UI")
+    void OnOpponentSelected(int32 SelectedOpponent);
+
+    // Funzione helper per spawnare il coin toss widget
+    UFUNCTION(BlueprintCallable, Category = "UI")
+    void SpawnCoinTossWidget();
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UOpponentSelectionWidget> OpponentSelectionWidgetClass;
+
+    // Variabile per l'istanza del widget di selezione
+    UPROPERTY()
+    UOpponentSelectionWidget* OpponentSelectionWidget;
 
  
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")

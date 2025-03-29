@@ -4,10 +4,11 @@
 #include "AWPlayerController.h"
 #include "HumanPlayer.h"
 #include "RandomPlayer.h"
+#include "AStarPlayer.h"
 #include "EngineUtils.h"
 #include "CoinTossWidget.h"
 #include "MovesPanel.h"
-
+#include "OpponentSelectionWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -53,30 +54,32 @@ AAWGameMode::AAWGameMode()
 void AAWGameMode::BeginPlay()
 {
     Super::BeginPlay();
-    
-    if (CoinTossWidgetClass)
+
+    if (OpponentSelectionWidgetClass)
     {
-        CoinTossWidget = CreateWidget<UCoinTossWidget>(GetWorld(), CoinTossWidgetClass);
-        if (CoinTossWidget)
+        OpponentSelectionWidget = CreateWidget<UOpponentSelectionWidget>(GetWorld(), OpponentSelectionWidgetClass);
+        if (OpponentSelectionWidget)
         {
-            // Ti sottoscrivi all’evento OnCoinTossCompleted
-            CoinTossWidget->OnCoinTossCompleted.AddDynamic(this, &AAWGameMode::CoinTossForStartingPlayer);
+            OpponentSelectionWidget->OnOpponentSelected.AddDynamic(this, &AAWGameMode::OnOpponentSelected);
+            OpponentSelectionWidget->AddToViewport();
 
-            CoinTossWidget->AddToViewport();
-
-            FInputModeGameAndUI InputMode;
-            // Mettiamo il focus sul widget stesso
-            InputMode.SetWidgetToFocus(CoinTossWidget->TakeWidget());
-            InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+            // Imposta l'input mode per l'interfaccia utente
+            FInputModeUIOnly InputMode;
+            InputMode.SetWidgetToFocus(OpponentSelectionWidget->TakeWidget());
             GetWorld()->GetFirstPlayerController()->SetInputMode(InputMode);
-
-            // Mostriamo il cursore
             GetWorld()->GetFirstPlayerController()->bShowMouseCursor = true;
-            // Imposti bCoinTossActive a true
-            bCoinTossActive = true;
 
+            // Il widget deve avere un evento (ad es. OnOpponentSelected) che chiama la funzione OnOpponentSelected in GameMode
         }
     }
+    else
+    {
+        // Se non c'è il widget di selezione, allora puoi spawnare direttamente il coin toss widget
+        SpawnCoinTossWidget();
+    }
+
+    
+    
     // In AAWGameMode::BeginPlay()
     if (MovesPanelClass)
     {
@@ -112,9 +115,6 @@ void AAWGameMode::BeginPlay()
     PlayerNames.Add(0, "Human");
 
 
-    auto* IA = GetWorld()->SpawnActor<ARandomPlayer>(FVector::ZeroVector, FRotator::ZeroRotator);
-    Players.Add(IA);
-    PlayerNames.Add(1, "IA");
 
 
     // Spawn del GameField
@@ -136,6 +136,68 @@ void AAWGameMode::BeginPlay()
     HumanPlayer->SetActorLocationAndRotation(CameraPos, CameraRot);
 
 
+}
+
+void AAWGameMode::OnOpponentSelected(int32 SelectedOpponent)
+{
+    // Salva la scelta nell'istanza del GameInstance
+    UAWGameInstance* GI = Cast<UAWGameInstance>(UGameplayStatics::GetGameInstance(GetWorld()));
+    if (GI)
+    {
+        GI->SetOpponent(SelectedOpponent);
+    }
+
+    // Rimuovi il widget di selezione
+    if (OpponentSelectionWidget)
+    {
+        OpponentSelectionWidget->RemoveFromParent();
+        OpponentSelectionWidget = nullptr;
+    }
+
+    // Ora spawniamo l'IA in base alla scelta
+    if (GI && GI->OpponentType == 1)  // AStar
+    {
+        auto* IA = GetWorld()->SpawnActor<AAStarPlayer>(FVector::ZeroVector, FRotator::ZeroRotator);
+        Players.Add(IA);
+        PlayerNames.Add(1, "IA");
+    }
+    else
+    {
+        auto* IA = GetWorld()->SpawnActor<ARandomPlayer>(FVector::ZeroVector, FRotator::ZeroRotator);
+        Players.Add(IA);
+        PlayerNames.Add(1, "IA");
+    }
+
+    // Ora, dopo la scelta, spawniamo il coin toss widget
+    SpawnCoinTossWidget();
+}
+
+
+void AAWGameMode::SpawnCoinTossWidget()
+{
+    if (CoinTossWidgetClass)
+    {
+        CoinTossWidget = CreateWidget<UCoinTossWidget>(GetWorld(), CoinTossWidgetClass);
+        if (CoinTossWidget)
+        {
+            // Ti sottoscrivi all’evento OnCoinTossCompleted
+            CoinTossWidget->OnCoinTossCompleted.AddDynamic(this, &AAWGameMode::CoinTossForStartingPlayer);
+
+            CoinTossWidget->AddToViewport();
+
+            FInputModeGameAndUI InputMode;
+            // Mettiamo il focus sul widget stesso
+            InputMode.SetWidgetToFocus(CoinTossWidget->TakeWidget());
+            InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+            GetWorld()->GetFirstPlayerController()->SetInputMode(InputMode);
+
+            // Mostriamo il cursore
+            GetWorld()->GetFirstPlayerController()->bShowMouseCursor = true;
+            // Imposti bCoinTossActive a true
+            bCoinTossActive = true;
+
+        }
+    }
 }
 
 // Aggiungi un parametro per ricevere il risultato
@@ -161,6 +223,7 @@ void AAWGameMode::CoinTossForStartingPlayer(int32 CoinResult)
                     CoinTossWidget = nullptr;
                     FInputModeGameOnly GameOnlyMode;
                     GetWorld()->GetFirstPlayerController()->SetInputMode(GameOnlyMode);
+                    GetWorld()->GetFirstPlayerController()->FlushPressedKeys();
                     // Se vuoi ancora il cursore visibile in gioco, rimetti bShowMouseCursor = true;
                     // Oppure false, se preferisci che sparisca
                     GetWorld()->GetFirstPlayerController()->bShowMouseCursor = true;
@@ -184,9 +247,8 @@ void AAWGameMode::CoinTossForStartingPlayer(int32 CoinResult)
 
 void AAWGameMode::PlaceUnitForCurrentPlayer()
 {
-    if (CurrentPlayer == 1) // Caso AI (RandomPlayer)
+    if (CurrentPlayer == 1) // Caso AI
     {
-
         // Ottieni una tile libera casuale dal GameField
         ATile* RandomTile = GField->GetRandomFreeTile();
         if (RandomTile)
@@ -212,101 +274,126 @@ void AAWGameMode::PlaceUnitForCurrentPlayer()
             FActorSpawnParameters SpawnParams;
             SpawnParams.Owner = this;
             FVector SpawnLocation = GField->GetRelativePositionByXYPosition(Position.X, Position.Y);
-            // Aggiungiamo un offset Z se necessario, ad esempio:
-            SpawnLocation.Z += 5.0f;
+            SpawnLocation.Z += 5.0f; // Offset Z
 
+            // Determina il tipo di AI da usare leggendo il GameInstance
+            UAWGameInstance* GI = Cast<UAWGameInstance>(UGameplayStatics::GetGameInstance(GetWorld()));
+            bool bUseAStar = (GI && GI->OpponentType == 1);
+
+            // Se devo posizionare uno Sniper
             if (bPlaceSniper)
             {
-                if (AISniperClass) // Usa il blueprint assegnato
+                ASniper* SpawnedUnit = nullptr;
+                if (bUseAStar)
                 {
-                    ASniper* SpawnedUnit = World->SpawnActor<ASniper>(AISniperClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
-                    if (SpawnedUnit)
+                    if (AStarSniperClass)
                     {
-                        bSniperPlaced.Add(1, true);
-                        SpawnedUnit->SetPlayerOwner(1);
-                        SpawnedUnit->SetGridPosition(Position.X, Position.Y);
-                        // Aggiorna la tile: imposta lo stato a OCCUPIED e associa l'unità
-
-
-                        UE_LOG(LogTemp, Log, TEXT("AI ha piazzato uno Sniper in %s"), *Position.ToString());
-                        if (GField && GField->TileMap.Contains(Position))
-                        {
-                            ATile* Tile = GField->TileMap[Position];
-                            if (Tile)
-                            {
-                                Tile->SetTileStatus(1, ETileStatus::OCCUPIED, SpawnedUnit);
-                            }
-                        }
-                        int32 NewUnitKey = GField->GameUnitMap.Num();
-                        GField->GameUnitMap.Add(NewUnitKey, SpawnedUnit);
-
+                        SpawnedUnit = World->SpawnActor<ASniper>(AStarSniperClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
+                    }
+                    else
+                    {
+                        UE_LOG(LogTemp, Warning, TEXT("AStarSniperClass non assegnato!"));
                     }
                 }
                 else
                 {
-                    UE_LOG(LogTemp, Warning, TEXT("AISniperClass non assegnato!"));
+                    if (AISniperClass)
+                    {
+                        SpawnedUnit = World->SpawnActor<ASniper>(AISniperClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
+                    }
+                    else
+                    {
+                        UE_LOG(LogTemp, Warning, TEXT("AISniperClass non assegnato!"));
+                    }
+                }
+
+                if (SpawnedUnit)
+                {
+                    bSniperPlaced.Add(1, true);
+                    SpawnedUnit->SetPlayerOwner(1);
+                    SpawnedUnit->SetGridPosition(Position.X, Position.Y);
+                    UE_LOG(LogTemp, Log, TEXT("AI ha piazzato uno Sniper in %s"), *Position.ToString());
+
+                    if (GField && GField->TileMap.Contains(Position))
+                    {
+                        ATile* Tile = GField->TileMap[Position];
+                        if (Tile)
+                        {
+                            Tile->SetTileStatus(1, ETileStatus::OCCUPIED, SpawnedUnit);
+                        }
+                    }
+                    int32 NewUnitKey = GField->GameUnitMap.Num();
+                    GField->GameUnitMap.Add(NewUnitKey, SpawnedUnit);
                 }
             }
+            // Altrimenti posiziona il Brawler
             else
             {
-                if (AIBrawlerClass) // Usa il blueprint assegnato
+                ABrawler* SpawnedUnit = nullptr;
+                if (bUseAStar)
                 {
-                    ABrawler* SpawnedUnit = World->SpawnActor<ABrawler>(AIBrawlerClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
-                    if (SpawnedUnit)
+                    if (AStarBrawlerClass)
                     {
-                        bBrawlerPlaced.Add(1, true);
-                        SpawnedUnit->SetPlayerOwner(1);
-                        SpawnedUnit->SetGridPosition(Position.X, Position.Y);
-                        UE_LOG(LogTemp, Log, TEXT("AI ha piazzato un Brawler in %s"), *Position.ToString());
-                        if (GField && GField->TileMap.Contains(Position))
-                        {
-                            ATile* Tile = GField->TileMap[Position];
-                            if (Tile)
-                            {
-                                Tile->SetTileStatus(1, ETileStatus::OCCUPIED, SpawnedUnit);
-                            }
-                        }
-                        int32 NewUnitKey = GField->GameUnitMap.Num();
-                        GField->GameUnitMap.Add(NewUnitKey, SpawnedUnit);
+                        SpawnedUnit = World->SpawnActor<ABrawler>(AStarBrawlerClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
                     }
-
+                    else
+                    {
+                        UE_LOG(LogTemp, Warning, TEXT("AStarBrawlerClass non assegnato!"));
+                    }
                 }
                 else
                 {
-                    UE_LOG(LogTemp, Warning, TEXT("AIBrawlerClass non assegnato!"));
+                    if (AIBrawlerClass)
+                    {
+                        SpawnedUnit = World->SpawnActor<ABrawler>(AIBrawlerClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
+                    }
+                    else
+                    {
+                        UE_LOG(LogTemp, Warning, TEXT("AIBrawlerClass non assegnato!"));
+                    }
                 }
 
+                if (SpawnedUnit)
+                {
+                    bBrawlerPlaced.Add(1, true);
+                    SpawnedUnit->SetPlayerOwner(1);
+                    SpawnedUnit->SetGridPosition(Position.X, Position.Y);
+                    UE_LOG(LogTemp, Log, TEXT("AI ha piazzato un Brawler in %s"), *Position.ToString());
+                    if (GField && GField->TileMap.Contains(Position))
+                    {
+                        ATile* Tile = GField->TileMap[Position];
+                        if (Tile)
+                        {
+                            Tile->SetTileStatus(1, ETileStatus::OCCUPIED, SpawnedUnit);
+                        }
+                    }
+                    int32 NewUnitKey = GField->GameUnitMap.Num();
+                    GField->GameUnitMap.Add(NewUnitKey, SpawnedUnit);
+                }
             }
-
         }
         else
         {
             UE_LOG(LogTemp, Warning, TEXT("Nessuna tile libera trovata per l'AI!"));
         }
-        // Passa il turno al giocatore umano dopo il posizionamento dell'AI
+        // Dopo il posizionamento dell'AI, passa il turno al giocatore umano
         UE_LOG(LogTemp, Warning, TEXT("piazzare humanplayer!"));
         NextTurn();
     }
-    else // Caso Human: il posizionamento umano viene gestito tramite l'input (click) in AHumanPlayer::OnClick()
+    else // Caso Human: gestito in AHumanPlayer::OnClick()
     {
-        // L'input del giocatore umano verrà gestito nel metodo OnClick()
+        // Gestione dell'input umano
     }
 
-    // Controlla se la fase di posizionamento è terminata
+    // Se tutte le unità sono posizionate (umano e AI), passa alla fase di battaglia
     if (bSniperPlaced[0] && bBrawlerPlaced[0] && bSniperPlaced[1] && bBrawlerPlaced[1])
     {
-        // Tutte le unità sono state posizionate: passa alla fase di battaglia
         CurrentPhase = EGamePhase::Battle;
         UE_LOG(LogTemp, Log, TEXT("Tutte le unità posizionate. Passaggio alla fase di battaglia."));
-
-
-
-        // Ora chiami NextTurn(), e se StartingPlayer == 1, parte l’AI
         NextTurn();
     }
-
-
 }
+
 
 int32 AAWGameMode::GetNextPlayer(int32 Player)
 {
@@ -374,10 +461,11 @@ void AAWGameMode::NextTurn()
 
         if (CurrentPlayer == 1)
         {
-            ARandomPlayer* AIPlayer = Cast<ARandomPlayer>(Players[1]);
+            UObject* AIObject = Players[1];
+            UE_LOG(LogTemp, Log, TEXT("AI Player class: %s"), *AIObject->GetClass()->GetName());
+            AAStarPlayer* AIPlayer = Cast<AAStarPlayer>(AIObject);
             if (AIPlayer)
             {
-                // Se l'AI è già in esecuzione, non farlo partire di nuovo
                 if (!bIsAITurnInProgress)
                 {
                     bIsAITurnInProgress = true;
@@ -386,16 +474,31 @@ void AAWGameMode::NextTurn()
             }
             else
             {
-                UE_LOG(LogTemp, Error, TEXT("RandomPlayer non trovato in Players[1]!"));
+                ARandomPlayer* RandomAI = Cast<ARandomPlayer>(AIObject);
+                if (RandomAI)
+                {
+                    if (!bIsAITurnInProgress)
+                    {
+                        bIsAITurnInProgress = true;
+                        RandomAI->OnTurn();
+                    }
+                }
+                else
+                {
+                    UE_LOG(LogTemp, Error, TEXT("AI player non trovato in Players[1]!"));
+                }
             }
         }
+
         else if (CurrentPlayer == 0)
         {
             bIsAITurnInProgress = false; // L'AI non sta eseguendo
             AHumanPlayer* HumanPlayer = Cast<AHumanPlayer>(Players[0]);
             if (HumanPlayer)
             {
+                
                 HumanPlayer->OnTurn();
+
             }
             else
             {

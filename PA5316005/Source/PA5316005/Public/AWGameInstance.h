@@ -16,14 +16,17 @@ public:
 	UPROPERTY(EditAnywhere)
 	FString CurrentTurnMessage = "Current Player";
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game Settings")
+	int32 OpponentType = 0;
+
 	// ************ SETTERS ************
 	// Imposta il messaggio del turno
 	UFUNCTION(BlueprintCallable)
 	void SetTurnMessage(FString Message);
 
-	// Imposta il tipo di avversario o la difficoltà (puoi usarlo per selezionare, ad esempio, AI Random o AStar)
 	UFUNCTION(BlueprintCallable)
 	void SetOpponent(const int32 SelectedOpp);
+
 
 	// Ritorna il messaggio corrente del turno
 	UFUNCTION(BlueprintCallable)

@@ -213,12 +213,16 @@ TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 
 bool AGameUnit::IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const
 {
-	//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell(%.0f, %.0f), bIsStart=%s"),
-		//CellPos.X, CellPos.Y, bIsStart ? TEXT("true") : TEXT("false"));
-
+	// Controlla che le coordinate siano all'interno della griglia
 	if (!GameMode || !GameMode->GField)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: GameMode o GField null per cella %s"), *CellPos.ToString());
+		return false;
+	}
+
+	if (!GameMode->GField->IsValidPosition(CellPos))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s fuori dai limiti della griglia"), *CellPos.ToString());
 		return false;
 	}
 
@@ -229,54 +233,47 @@ bool AGameUnit::IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const
 		return false;
 	}
 
-	
-		ATile* Tile = GF->TileMap[CellPos];
-		if (!Tile)
-		{
-			//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Tile a %s è NULL"), *CellPos.ToString());
-			return false;
-		}
+	ATile* Tile = GF->TileMap[CellPos];
+	if (!Tile)
+	{
+		return false;
+	}
 
+	if (bIsStart)
+	{
+		if (Tile->GetGameUnit() == this)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Cella di partenza %s valida: occupata dalla stessa unità (ID: %d)"),
+				*CellPos.ToString(), this->GetGameUnitID());
+			return true;
+		}
+	}
+
+	// Se la tile è un ostacolo, la cella non è valida
+	if (Tile->GetTileStatus() == ETileStatus::OBSTACLE)
+	{
+		return false;
+	}
+
+	// Se la tile è OCCUPIED, l'unità può passare solo se è la cella di partenza
+	if (Tile->GetTileStatus() == ETileStatus::OCCUPIED)
+	{
 		if (bIsStart)
 		{
 			if (Tile->GetGameUnit() == this)
 			{
-				UE_LOG(LogTemp, Warning, TEXT("Cella di partenza %s valida: occupata dalla stessa unità (ID: %d)"), *CellPos.ToString(), this->GetGameUnitID());
 				return true;
 			}
 		}
-
-
-		// Controlla se la tile è un ostacolo
-		if (Tile->GetTileStatus() == ETileStatus::OBSTACLE)
+		else
 		{
-			//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s scartata -> OBSTACLE"), *CellPos.ToString());
 			return false;
 		}
-
-		// Se la tile è OCCUPIED...
-		if (Tile->GetTileStatus() == ETileStatus::OCCUPIED)
-		{
-			if (bIsStart)
-			{
-				if (Tile->GetGameUnit() == this)
-				{
-					//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s (start) valida: occupata da me stesso"), *CellPos.ToString());
-					return true;
-				}
-	
-			}
-			else
-			{
-				//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s scartata -> OCCUPIED"), *CellPos.ToString());
-				return false;
-			}
-		}
-
-		// Se la tile è EMPTY, è valida
-		//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s valida: EMPTY"), *CellPos.ToString());
-		return true;
 	}
+
+	// Se la tile è EMPTY, la cella è valida
+	return true;
+}
 
 
 TArray<FVector2D> AGameUnit::CalculatePath(const FVector2D& EndPos)

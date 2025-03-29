@@ -222,8 +222,7 @@ template void AGameField::GenerateGameUnit<ABrawler>(FVector2D Position, int32 P
 
 inline bool AGameField::IsValidPosition(const FVector2D Position) const
 {
-	return Position.X >= 0.f && Position.X < static_cast<float>(Size) &&
-		Position.Y >= 0.f && Position.Y < static_cast<float>(Size);
+	return 0 <= Position.X && Position.X < Size && 0 <= Position.Y && Position.Y < Size;
 }
 
 void AGameField::SelectTile(const FVector2D Position)
@@ -291,25 +290,106 @@ void AGameField::ShowLegalMovesInTheField()
 	}
 }
 
+// Funzione per controllare se tutte le celle libere sono raggiungibili
+bool AGameField::IsGridConnected() const
+{
+	// Trova una cella libera di partenza
+	FVector2D StartPos(-1, -1);
+	for (ATile* Tile : TileArray)
+	{
+		if (Tile && Tile->GetTileStatus() != ETileStatus::OBSTACLE)
+		{
+			StartPos = Tile->GetGridPosition();
+			break;
+		}
+	}
+	if (StartPos.X < 0)
+	{
+		// Se non troviamo celle libere, consideriamo la griglia connessa
+		return true;
+	}
+
+	// BFS per esplorare le celle libere
+	TSet<FVector2D> Visited;
+	TQueue<FVector2D> Queue;
+	Queue.Enqueue(StartPos);
+	Visited.Add(StartPos);
+
+	TArray<FVector2D> Directions = { FVector2D(1, 0), FVector2D(-1, 0), FVector2D(0, 1), FVector2D(0, -1) };
+
+	while (!Queue.IsEmpty())
+	{
+		FVector2D Current;
+		Queue.Dequeue(Current);
+		for (const FVector2D& Dir : Directions)
+		{
+			FVector2D Neighbor = Current + Dir;
+			if (IsValidPosition(Neighbor) && !Visited.Contains(Neighbor))
+			{
+				ATile* NeighborTile = nullptr;
+				if (TileMap.Contains(Neighbor))
+				{
+					NeighborTile = TileMap[Neighbor];
+				}
+				if (NeighborTile && NeighborTile->GetTileStatus() != ETileStatus::OBSTACLE)
+				{
+					Visited.Add(Neighbor);
+					Queue.Enqueue(Neighbor);
+				}
+			}
+		}
+	}
+
+	// Conta quante celle libere ci sono nella griglia
+	int32 TotalFreeCells = 0;
+	for (ATile* Tile : TileArray)
+	{
+		if (Tile && Tile->GetTileStatus() != ETileStatus::OBSTACLE)
+		{
+			TotalFreeCells++;
+		}
+	}
+
+	return Visited.Num() == TotalFreeCells;
+}
+
+// Modifica della funzione di generazione degli ostacoli
 void AGameField::GenerateObstacles(float ObstaclePercentage)
 {
-	//UE_LOG(LogTemp, Warning, TEXT("GenerateObstacles chiamata con perc=%f"), ObstaclePercentage);
-
 	int32 TotalCells = Size * Size;
 	int32 ObstaclesToPlace = FMath::RoundToInt(TotalCells * ObstaclePercentage);
-
 	int32 Placed = 0;
-	while (Placed < ObstaclesToPlace)
+	int32 Attempts = 0;
+	int32 MaxAttempts = ObstaclesToPlace * 10; // Per evitare loop infiniti
+
+	while (Placed < ObstaclesToPlace && Attempts < MaxAttempts)
 	{
+		Attempts++;
 		int32 RandIndex = FMath::RandRange(0, TileArray.Num() - 1);
 		ATile* RandTile = TileArray[RandIndex];
 		if (RandTile && RandTile->GetTileStatus() == ETileStatus::EMPTY)
 		{
+			// Segna temporaneamente la tile come ostacolo
 			RandTile->SetTileStatus(-1, ETileStatus::OBSTACLE, nullptr);
 			RandTile->SetTileMaterial();
-			//UE_LOG(LogTemp, Warning, TEXT("Piazzato ostacolo sulla tile %s"), *RandTile->GetGridPosition().ToString());
-			Placed++;
+
+			// Verifica la connettività della griglia
+			if (!IsGridConnected())
+			{
+				// Se la griglia non è connessa, ripristina lo stato EMPTY
+				RandTile->SetTileStatus(AGameField::NOT_ASSIGNED, ETileStatus::EMPTY, nullptr);
+				RandTile->SetTileMaterial();
+			}
+			else
+			{
+				Placed++;
+			}
 		}
+	}
+
+	if (Attempts >= MaxAttempts)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("GenerateObstacles: tentativi massimi raggiunti, ostacoli posizionati: %d"), Placed);
 	}
 }
 

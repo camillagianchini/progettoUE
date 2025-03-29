@@ -8,10 +8,13 @@ void UAWGameInstance::SetTurnMessage(FString Message)
 
 void UAWGameInstance::SetOpponent(const int32 SelectedOpp)
 {
-	// Implementa qui la logica per impostare il tipo di avversario o la difficoltà.
-	// Per esempio, potresti salvare SelectedOpp in una variabile membro (non mostrata in questo esempio).
-}
+	// Imposta il tipo di avversario.
+	// Ad esempio: 0 = Random AI, 1 = AStar AI.
+	OpponentType = SelectedOpp;
+	UE_LOG(LogTemp, Log, TEXT("Opponent type set to: %d"), OpponentType);
 
+	// Se desideri, puoi eseguire ulteriori logiche qui, ad esempio aggiornare variabili di difficoltà o notificare altri sistemi.
+}
 
 
 FString UAWGameInstance::GetTurnMessage()

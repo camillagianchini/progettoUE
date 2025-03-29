@@ -362,5 +362,10 @@ void AHumanPlayer::DoNextUnitAction()
 		GameMode->GField->ResetGameStatusField();
 		GameMode->GField->ShowLegalMovesForUnit(NextUnit);
 		UE_LOG(LogTemp, Log, TEXT("Seleziono unità ID=%d per la prossima azione"), NextUnit->GetGameUnitID());
+		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		{
+			UE_LOG(LogTemp, Log, TEXT("DoNextUnitAction: FlushPressedKeys chiamato."));
+			PC->FlushPressedKeys();
+		}
 	}
 }

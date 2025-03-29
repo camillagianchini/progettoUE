@@ -125,7 +125,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void ShowLegalMovesForUnit(AGameUnit* Unit);
 
-
+	bool IsGridConnected() const;
 	void MoveUnit(AGameUnit* Unit, const FVector2D& NewPos, TFunction<void()> OnMovementFinished);
 
 

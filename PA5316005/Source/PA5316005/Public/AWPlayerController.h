@@ -30,9 +30,9 @@ public:
 	void ClickOnGrid();
 
 protected:
+	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
 
-	virtual void BeginPlay() override;
 
 
 };
