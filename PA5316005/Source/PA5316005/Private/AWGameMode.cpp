@@ -6,6 +6,7 @@
 #include "RandomPlayer.h"
 #include "AStarPlayer.h"
 #include "EngineUtils.h"
+#include "UnitListWidget.h"
 #include "CoinTossWidget.h"
 #include "MovesPanel.h"
 #include "OpponentSelectionWidget.h"
@@ -91,14 +92,6 @@ void AAWGameMode::BeginPlay()
     }
 
 
-    if (UnitListWidgetClass)
-    {
-        UnitListWidget = CreateWidget<UUserWidget>(GetWorld(), UnitListWidgetClass);
-        if (UnitListWidget)
-        {
-            UnitListWidget->AddToViewport();
-        }
-    }
 
 
     // Ottieni il riferimento al HumanPlayer (Pawn del primo PlayerController)
@@ -147,7 +140,7 @@ void AAWGameMode::OnOpponentSelected(int32 SelectedOpponent)
         GI->SetOpponent(SelectedOpponent);
     }
 
-    // Rimuovi il widget di selezione
+    // Rimuovi il widget di selezione dell'opponente
     if (OpponentSelectionWidget)
     {
         OpponentSelectionWidget->RemoveFromParent();
@@ -168,8 +161,31 @@ void AAWGameMode::OnOpponentSelected(int32 SelectedOpponent)
         PlayerNames.Add(1, "IA");
     }
 
-    // Ora, dopo la scelta, spawniamo il coin toss widget
+    // Spawna il coin toss widget
     SpawnCoinTossWidget();
+
+    // Dopo un delay, crea e mostra il widget della UnitList
+    FTimerHandle TimerHandle;
+    GetWorldTimerManager().SetTimer(TimerHandle, [this, GI]()
+        {
+            if (UnitListWidgetClass)
+            {
+                // Crea l'istanza e castala al tipo specifico UUnitListWidget
+                UUnitListWidget* UnitList = CreateWidget<UUnitListWidget>(GetWorld(), UnitListWidgetClass);
+                if (UnitList)
+                {
+                    // Imposta il tipo di avversario sul widget
+                    EOpponentType OppType = (GI->OpponentType == 1) ? EOpponentType::AStar : EOpponentType::Random;
+                    UnitList->SetOpponentType(OppType);
+
+                    // Aggiungi il widget al viewport
+                    UnitList->AddToViewport();
+
+                    // Se necessario, salva il riferimento per usi futuri
+                    UnitListWidget = UnitList;
+                }
+            }
+        }, 4.0f, false); // 2 secondi di delay (modifica se necessario)
 }
 
 

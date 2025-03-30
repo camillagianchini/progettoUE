@@ -11,6 +11,7 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnOpponentSelected, int32, SelectedOpponent);
 
 class Button;
+
 /**
  * 
  */
@@ -26,6 +27,8 @@ public:
 
     UPROPERTY(meta = (BindWidget))
     class UButton* AStarButton;
+
+
 
     // Dispatcher per notificare la scelta
     UPROPERTY(BlueprintAssignable, Category = "Opponent")

@@ -229,42 +229,86 @@ void AAStarPlayer::PerformAStarActionOnUnit(AGameUnit* Unit)
         return;
     }
 
-    // Trova la posizione dell'unità nemica più vicina
-    FVector2D EnemyPos = GetClosestEnemyPosition(Unit);
-    // Calcola la cella target raggiungibile entro il range di movimento dell'unità
-    FVector2D TargetPos = GetTargetPositionForUnit(Unit, EnemyPos);
-
     AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
     if (!GM || !GM->GField)
     {
         return;
     }
 
-    // Esegui lo spostamento usando il percorso A*
+    // Ottieni la posizione corrente dell'unità e quella del nemico più vicino
+    FVector2D UnitPos = Unit->GetGridPosition();
+    FVector2D EnemyPos = GetClosestEnemyPosition(Unit);
+    float ManhattanDistance = FMath::Abs(EnemyPos.X - UnitPos.X) + FMath::Abs(EnemyPos.Y - UnitPos.Y);
+
+    // Se l'unità nemica è esattamente ad una casella di distanza, attacca senza muoversi
+    if (ManhattanDistance == 1)
+    {
+        // Mostra le tile di attacco
+        GM->GField->ShowLegalAttackOptionsForUnit(Unit);
+
+        // Attendi brevemente per dare tempo alla UI di evidenziare le tile, quindi attacca
+        FTimerHandle AttackDelay;
+        GetWorld()->GetTimerManager().SetTimer(AttackDelay, [this, Unit, GM]()
+            {
+                // Calcola le possibili celle di attacco dalla posizione corrente
+                TArray<FVector2D> AttackOptions = Unit->CalculateAttackMoves();
+                TArray<FVector2D> ValidAttacks;
+                for (const FVector2D& APos : AttackOptions)
+                {
+                    if (GM->GField->IsValidPosition(APos))
+                    {
+                        ATile* Tile = GM->GField->TileMap.Contains(APos) ? GM->GField->TileMap[APos] : nullptr;
+                        if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
+                        {
+                            AGameUnit* Target = Tile->GetGameUnit();
+                            // Supponiamo che le unità nemiche abbiano PlayerOwner == 0
+                            if (Target && Target->GetPlayerOwner() == 0)
+                            {
+                                ValidAttacks.Add(APos);
+                            }
+                        }
+                    }
+                }
+
+                if (ValidAttacks.Num() > 0)
+                {
+                    FVector2D AttackChoice = ValidAttacks[FMath::RandRange(0, ValidAttacks.Num() - 1)];
+                    GM->GField->AttackUnit(Unit, AttackChoice);
+                    UE_LOG(LogTemp, Warning, TEXT("A* AI -> Unit %d attacked enemy at (%f, %f) without moving"),
+                        Unit->GetGameUnitID(), AttackChoice.X, AttackChoice.Y);
+                }
+                Unit->bHasAttacked = true;
+                GM->GField->ResetGameStatusField();
+            }, 0.5f, false);
+
+        return;
+    }
+
+    // Se non è già ad una casella di distanza, calcola il percorso tramite A* e spostati fino al limite del range
+    FVector2D TargetPos = GetTargetPositionForUnit(Unit, EnemyPos);
     GM->GField->MoveUnit(Unit, TargetPos, [this, Unit, GM, TargetPos]()
         {
-            UE_LOG(LogTemp, Warning, TEXT("A* AI -> Unit %d moved to (%f, %f)"), Unit->GetGameUnitID(), TargetPos.X, TargetPos.Y);
+            UE_LOG(LogTemp, Warning, TEXT("A* AI -> Unit %d moved to (%f, %f)"),
+                Unit->GetGameUnitID(), TargetPos.X, TargetPos.Y);
             Unit->bHasMoved = true;
 
-            // Dopo lo spostamento, mostra le tile di attacco (stessa logica degli altri player)
+            // Mostra le tile di attacco dopo lo spostamento
             GM->GField->ShowLegalAttackOptionsForUnit(Unit);
 
-            // Attendi 0.5 secondi per visualizzare le tile di attacco, quindi esegui l'attacco se possibile
+            // Attendi brevemente, poi esegui l'attacco se possibile
             FTimerHandle AttackDelay;
             GetWorld()->GetTimerManager().SetTimer(AttackDelay, [this, Unit, GM]()
                 {
-                    // Calcola le possibili celle di attacco dalla nuova posizione
                     TArray<FVector2D> PostMoveAttacks = Unit->CalculateAttackMoves();
                     TArray<FVector2D> PostMoveValid;
                     for (const FVector2D& APos : PostMoveAttacks)
                     {
                         if (GM->GField->IsValidPosition(APos))
                         {
-                            ATile* T = GM->GField->TileMap[APos];
-                            if (T && T->GetTileStatus() == ETileStatus::OCCUPIED)
+                            ATile* Tile = GM->GField->TileMap.Contains(APos) ? GM->GField->TileMap[APos] : nullptr;
+                            if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
                             {
-                                AGameUnit* Target = T->GetGameUnit();
-                                // Se il bersaglio è nemico (supponendo che nemico abbia PlayerOwner == 0)
+                                AGameUnit* Target = Tile->GetGameUnit();
                                 if (Target && Target->GetPlayerOwner() == 0)
                                 {
                                     PostMoveValid.Add(APos);
@@ -277,10 +321,10 @@ void AAStarPlayer::PerformAStarActionOnUnit(AGameUnit* Unit)
                     {
                         FVector2D AttackChoice = PostMoveValid[FMath::RandRange(0, PostMoveValid.Num() - 1)];
                         GM->GField->AttackUnit(Unit, AttackChoice);
-                        UE_LOG(LogTemp, Warning, TEXT("A* AI -> Unit %d attacked enemy at (%f, %f)"), Unit->GetGameUnitID(), AttackChoice.X, AttackChoice.Y);
+                        UE_LOG(LogTemp, Warning, TEXT("A* AI -> Unit %d attacked enemy at (%f, %f)"),
+                            Unit->GetGameUnitID(), AttackChoice.X, AttackChoice.Y);
                     }
                     Unit->bHasAttacked = true;
-                    // Resetta le evidenziazioni
                     GM->GField->ResetGameStatusField();
                 }, 0.5f, false);
         });
