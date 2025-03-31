@@ -17,12 +17,12 @@ void UOpponentSelectionWidget::NativeConstruct()
 
 void UOpponentSelectionWidget::HandleRandomClicked()
 {
-    OnOpponentSelected.Broadcast(0); // 0 = Random
+    OnOpponentSelected.Broadcast(0); 
     RemoveFromParent();
 }
 
 void UOpponentSelectionWidget::HandleAStarClicked()
 {
-    OnOpponentSelected.Broadcast(1); // 1 = AStar
+    OnOpponentSelected.Broadcast(1); 
     RemoveFromParent();
 }

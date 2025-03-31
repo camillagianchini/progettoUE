@@ -7,7 +7,7 @@
 #include "Components/Image.h"
 #include "UnitListWidget.generated.h"
 
-// Enum per il tipo di avversario
+
 UENUM(BlueprintType)
 enum class EOpponentType : uint8
 {
@@ -15,59 +15,56 @@ enum class EOpponentType : uint8
 	AStar   UMETA(DisplayName = "AStar")
 };
 
-/**
- * Widget per visualizzare la salute delle unità
- */
 UCLASS()
 class PA5316005_API UUnitListWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
-	// Funzione per aggiornare la salute della progress bar in base alle unità
-	UFUNCTION(BlueprintCallable, Category = "UnitList")
-	void UpdateUnitHealth(bool bIsHuman, EGameUnitType UnitType, float HPPercent);
 
-	// Funzione per impostare il tipo di avversario e aggiornare le immagini corrispondenti
-	UFUNCTION(BlueprintCallable, Category = "UnitList")
-	void SetOpponentType(EOpponentType NewOpponent);
+    UFUNCTION(BlueprintCallable, Category = "UnitList")
+    void UpdateUnitHealth(bool bIsHuman, EGameUnitType UnitType, float HPPercent);
+
+
+    UFUNCTION(BlueprintCallable, Category = "UnitList")
+    void SetOpponentType(EOpponentType NewOpponent);
 
 protected:
-	// Progress Bar per le unità umane
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	UProgressBar* PBHumanSniper;
+    // --- Human Unit Progress Bars ---
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+    UProgressBar* PBHumanSniper;
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	UProgressBar* PBHumanBrawler;
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+    UProgressBar* PBHumanBrawler;
 
-	// Progress Bar per le unità AI
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	UProgressBar* PBASniper;
+    // --- AI Unit Progress Bars ---
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+    UProgressBar* PBASniper;
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	UProgressBar* PBABrawler;
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+    UProgressBar* PBABrawler;
 
-	// Immagini per rappresentare le unità AI: cambiano in base all'avversario scelto
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	UImage* AISniperImage;
+    // --- AI Unit Images ---
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+    UImage* AISniperImage;
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	UImage* AIBrawlerImage;
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+    UImage* AIBrawlerImage;
 
-	// Texture da assegnare alle immagini, in base al tipo di avversario
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UnitList|Images")
-	UTexture2D* RandomSniperTexture;
+    // --- Textures for AI Unit Images ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UnitList|Images")
+    UTexture2D* RandomSniperTexture;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UnitList|Images")
-	UTexture2D* AStarSniperTexture;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UnitList|Images")
+    UTexture2D* AStarSniperTexture;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UnitList|Images")
-	UTexture2D* RandomBrawlerTexture;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UnitList|Images")
+    UTexture2D* RandomBrawlerTexture;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UnitList|Images")
-	UTexture2D* AStarBrawlerTexture;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UnitList|Images")
+    UTexture2D* AStarBrawlerTexture;
 
-	// Variabile che memorizza il tipo di avversario selezionato
-	UPROPERTY(BlueprintReadOnly, Category = "UnitList")
-	EOpponentType OpponentType;
+    // --- Currently selected opponent type ---
+    UPROPERTY(BlueprintReadOnly, Category = "UnitList")
+    EOpponentType OpponentType;
 };

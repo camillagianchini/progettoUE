@@ -16,24 +16,19 @@ public:
 
 	AAWPlayerController();
 
-
-
-	// Input mapping context per il gioco a turni
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputMappingContext* AWContext;
 
-	// L'azione di click (da definire nell'Enhanced Input)
 	UPROPERTY(EditAnywhere, Category = Input)
 	UInputAction* ClickAction;
 
-	// Metodo chiamato al click del mouse; viene passato al Pawn (HumanPlayer)
 	void ClickOnGrid();
 
 protected:
+
 	virtual void BeginPlay() override;
+
 	virtual void SetupInputComponent() override;
-
-
 
 };
 

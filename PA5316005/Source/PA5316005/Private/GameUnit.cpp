@@ -8,21 +8,21 @@
 
 int32 AGameUnit::NewGameUnitID = 0;
 
-// Sets default values
+
 AGameUnit::AGameUnit()
 {
 	PrimaryActorTick.bCanEverTick = true;
+
 	bHasMoved = false;
 	bHasAttacked = false;
-	// Creazione dei componenti base
+
 	Scene = CreateDefaultSubobject<USceneComponent>(TEXT("Scene"));
 	StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMeshComponent"));
 
-	// Imposta il componente di root e attacca il mesh
+
 	SetRootComponent(Scene);
 	StaticMeshComponent->SetupAttachment(Scene);
 
-	// Inizializza le proprietà della GameUnit
 	GameUnitGridPosition = FVector2D(-1, -1);
 	PlayerOwner = -1;
 	GameUnitID = -100;
@@ -31,18 +31,15 @@ AGameUnit::AGameUnit()
 	AttackRange = 0;
 	DamageMin = 0;
 	DamageMax = 0;
-	GameUnitType = EGameUnitType::SNIPER; // Valore di default; può essere modificato tramite setter
+	GameUnitType = EGameUnitType::SNIPER;
 	GameMode = nullptr;
-	
 }
 
-// Called every frame
 void AGameUnit::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }
 
-// Called when the game starts or when spawned
 void AGameUnit::BeginPlay()
 {
 	Super::BeginPlay();
@@ -58,7 +55,7 @@ TArray<FVector2D> AGameUnit::CalculateAttackMoves() const
 
 void AGameUnit::SetGameUnitID()
 {
-	// Incrementa l'ID e lo assegna all'unità
+
 	GameUnitID = NewGameUnitID++;
 }
 
@@ -143,22 +140,19 @@ int32 AGameUnit::GetDamageMax() const
 	return DamageMax;
 }
 
-
-
+// BFS
 TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 {
 	TArray<FVector2D> Result;
 
-	// Recupera il GameMode
 	AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
 	if (!GM || !GM->GField)
 	{
 		return Result;
 	}
 
-	int32 FS = GM->FieldSize; // ecco la variabile locale FS che useremo come dimensione massima
+	int32 FS = GM->FieldSize;
 
-	// Strutture BFS
 	TQueue<FVector2D> Frontier;
 	TSet<FVector2D> Visited;
 	TMap<FVector2D, int32> DistMap;
@@ -167,7 +161,6 @@ TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 	Visited.Add(GetGridPosition());
 	DistMap.Add(GetGridPosition(), 0);
 
-	// Direzioni di spostamento
 	static TArray<FVector2D> Dirs = {
 		FVector2D(1, 0), FVector2D(-1, 0),
 		FVector2D(0, 1), FVector2D(0, -1)
@@ -183,7 +176,6 @@ TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 		{
 			FVector2D Next = Current + Dir;
 
-			// Controllo i confini in base a FS
 			if (Next.X < 0 || Next.X >= FS || Next.Y < 0 || Next.Y >= FS)
 			{
 				continue;
@@ -192,8 +184,7 @@ TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 			int32 NextDist = CurrentDist + 1;
 			if (NextDist <= MovementRange && !Visited.Contains(Next))
 			{
-				// Se la cella è valida (non è un ostacolo o un'unità occupata, ecc.)
-				if (IsValidGridCell(Next, /*bIsStart*/ false))
+				if (IsValidGridCell(Next, false))
 				{
 					Result.Add(Next);
 					Frontier.Enqueue(Next);
@@ -207,29 +198,24 @@ TArray<FVector2D> AGameUnit::CalculateLegalMoves()
 	return Result;
 }
 
-
-
-
-
 bool AGameUnit::IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const
 {
-	// Controlla che le coordinate siano all'interno della griglia
 	if (!GameMode || !GameMode->GField)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: GameMode o GField null per cella %s"), *CellPos.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: GameMode or GField is null for cell %s"), *CellPos.ToString());
 		return false;
 	}
 
 	if (!GameMode->GField->IsValidPosition(CellPos))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s fuori dai limiti della griglia"), *CellPos.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cell %s is out of grid bounds"), *CellPos.ToString());
 		return false;
 	}
 
 	AGameField* GF = GameMode->GField;
 	if (!GF->TileMap.Contains(CellPos))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cella %s non trovata nella TileMap"), *CellPos.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("IsValidGridCell: Cell %s not found in TileMap"), *CellPos.ToString());
 		return false;
 	}
 
@@ -243,19 +229,16 @@ bool AGameUnit::IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const
 	{
 		if (Tile->GetGameUnit() == this)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Cella di partenza %s valida: occupata dalla stessa unità (ID: %d)"),
-				*CellPos.ToString(), this->GetGameUnitID());
+			//UE_LOG(LogTemp, Warning, TEXT("Starting cell %s is valid: occupied by this unit (ID: %d)"),*CellPos.ToString(), this->GetGameUnitID());
 			return true;
 		}
 	}
 
-	// Se la tile è un ostacolo, la cella non è valida
 	if (Tile->GetTileStatus() == ETileStatus::OBSTACLE)
 	{
 		return false;
 	}
 
-	// Se la tile è OCCUPIED, l'unità può passare solo se è la cella di partenza
 	if (Tile->GetTileStatus() == ETileStatus::OCCUPIED)
 	{
 		if (bIsStart)
@@ -271,31 +254,26 @@ bool AGameUnit::IsValidGridCell(const FVector2D& CellPos, bool bIsStart) const
 		}
 	}
 
-	// Se la tile è EMPTY, la cella è valida
 	return true;
 }
 
-
+// BFS
 TArray<FVector2D> AGameUnit::CalculatePath(const FVector2D& EndPos)
 {
 	TArray<FVector2D> Path;
 
-	// 1) Recupera il riferimento al GameField
-	//    (assumendo di avere GameMode->GField disponibile)
 	if (!GameMode || !GameMode->GField)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("CalculatePath: GameField non valido."));
+		UE_LOG(LogTemp, Warning, TEXT("CalculatePath: Invalid GameField."));
 		return Path;
 	}
 
 	FVector2D StartPos = GetGridPosition();
 	if (StartPos == EndPos)
 	{
-		// Se già stai sulla cella di destinazione, path vuoto
 		return Path;
 	}
 
-	// 2) Strutture BFS
 	TQueue<FVector2D> Frontier;
 	TSet<FVector2D> Visited;
 	TMap<FVector2D, FVector2D> CameFrom;
@@ -304,21 +282,18 @@ TArray<FVector2D> AGameUnit::CalculatePath(const FVector2D& EndPos)
 	Visited.Add(StartPos);
 	CameFrom.Add(StartPos, StartPos);
 
-	// 3) Direzioni (4 direzioni ortogonali)
 	TArray<FVector2D> Directions;
 	Directions.Add(FVector2D(1, 0));
 	Directions.Add(FVector2D(-1, 0));
 	Directions.Add(FVector2D(0, 1));
 	Directions.Add(FVector2D(0, -1));
 
-	// 4) BFS loop
 	bool bFound = false;
 	while (!Frontier.IsEmpty())
 	{
 		FVector2D Current;
 		Frontier.Dequeue(Current);
 
-		// Se abbiamo trovato EndPos, interrompiamo
 		if (Current == EndPos)
 		{
 			bFound = true;
@@ -342,53 +317,35 @@ TArray<FVector2D> AGameUnit::CalculatePath(const FVector2D& EndPos)
 
 	if (!bFound)
 	{
-		// Nessun path trovato
 		return Path;
 	}
 
-	// 5) Ricostruisci il percorso facendo backtracking da EndPos
 	FVector2D Tracer = EndPos;
 	while (Tracer != StartPos)
 	{
 		Path.Add(Tracer);
 		Tracer = CameFrom[Tracer];
 	}
-	// (opzionale) Aggiungi la cella di partenza se vuoi
-	// Path.Add(StartPos);
-
-	// Il path ora è al contrario (da EndPos a StartPos), quindi lo inverti
 	Algo::Reverse(Path);
 
 	return Path;
 }
 
 
-
-
-
-
-// In GameUnit.cpp
 void AGameUnit::TakeDamageUnit(int32 DamageAmount, AGameUnit* Attacker)
 {
-	UE_LOG(LogTemp, Warning, TEXT("TakeDamageUnit: ID=%d, Danno=%d"), GetGameUnitID(), DamageAmount);
+	//UE_LOG(LogTemp, Warning, TEXT("TakeDamageUnit: ID=%d, Damage=%d"), GetGameUnitID(), DamageAmount);
 
-	// 1) Sottraggo gli HP
 	HitPoints -= DamageAmount;
 	if (HitPoints < 0)
 	{
 		HitPoints = 0;
 	}
 
-	// 2) Determino i MaxHP in base al tipo (Sniper=20, Brawler=40)
 	const int32 MaxHP = (GameUnitType == EGameUnitType::SNIPER) ? 20 : 40;
 
-	// 3) Calcolo la percentuale di vita [0..1]
 	const float HPPercent = (MaxHP > 0) ? (float)HitPoints / (float)MaxHP : 0.f;
-	UE_LOG(LogTemp, Warning, TEXT("TakeDamageUnit: ID=%d, HitPoints=%d, HPPercent=%f"),
-		GetGameUnitID(), HitPoints, HPPercent);
 
-	// 4) Aggiorno l’interfaccia (widget) se presente
-	//    (Assumendo di avere AAWGameMode con un UUnitListWidget* UnitListWidget)
 	if (UUserWidget* BaseWidget = GameMode->UnitListWidget)
 	{
 		UUnitListWidget* MyWidget = Cast<UUnitListWidget>(BaseWidget);
@@ -400,13 +357,10 @@ void AGameUnit::TakeDamageUnit(int32 DamageAmount, AGameUnit* Attacker)
 		}
 	}
 
-	// 5) Se la nostra unità è appena morta, rimuovila e basta
-	//    (così eviti di fare contrattacchi inutili se siamo a 0 HP)
 	if (HitPoints <= 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Unit ID=%d è morta."), GetGameUnitID());
+		//UE_LOG(LogTemp, Warning, TEXT("Unit ID=%d is dead."), GetGameUnitID());
 
-		// Rimuovo dalla griglia
 		if (AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode()))
 		{
 			if (GM->GField)
@@ -418,27 +372,17 @@ void AGameUnit::TakeDamageUnit(int32 DamageAmount, AGameUnit* Attacker)
 				}
 			}
 		}
-		// Distruggo l’attore
 		Destroy();
 		return;
 	}
-
-	// 6) Se NON siamo morti e l'Attacker è valido, controlliamo il contrattacco.
-	//    Dato che tu hai la funzione "ASniper::HandleCounterAttack(AGameUnit* AttackedUnit)"
-	//    che parte dal punto di vista del *Sniper*, basta:
 	if (Attacker && Attacker->GetGameUnitType() == EGameUnitType::SNIPER)
 	{
-		// Cast a ASniper
 		if (ASniper* TheSniper = Cast<ASniper>(Attacker))
 		{
-			// Chiediamo al *loro* Sniper di "gestire" il contrattacco contro *this*.
-			// (Nella tua HandleCounterAttack, "AttackedUnit" = la vittima del contrattacco, cioè "this".)
 			TheSniper->HandleCounterAttack(this);
 		}
 	}
 }
-
-
 
 bool AGameUnit::IsDead() const
 {

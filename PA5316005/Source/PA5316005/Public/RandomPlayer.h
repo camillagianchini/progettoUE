@@ -1,5 +1,3 @@
-// RandomPlayer.h
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -13,20 +11,23 @@ class PA5316005_API ARandomPlayer : public AActor, public IPlayerInterface
     GENERATED_BODY()
 
 public:
+
     virtual void OnTurn() override;
 
     ARandomPlayer();
 
-    // RandomPlayer.h
+    
     UPROPERTY()
-    TArray<AGameUnit*> UnitsSequence;
+    TArray<AGameUnit*> UnitsSequence; 
 
 
     int32 SequenceIndex;
 
 
 private:
+
     void PerformRandomActionOnUnit(class AGameUnit* Unit);
+
     void DoNextUnitAction();
 };
 

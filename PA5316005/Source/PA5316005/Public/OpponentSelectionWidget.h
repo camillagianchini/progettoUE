@@ -28,13 +28,11 @@ public:
     UPROPERTY(meta = (BindWidget))
     class UButton* AStarButton;
 
-
-
-    // Dispatcher per notificare la scelta
     UPROPERTY(BlueprintAssignable, Category = "Opponent")
     FOnOpponentSelected OnOpponentSelected;
 
 protected:
+
     virtual void NativeConstruct() override;
 
 private:

@@ -1,13 +1,12 @@
 #include "UnitListWidget.h"
 #include "Components/ProgressBar.h"
 #include "Components/Image.h"
+#include "Styling/SlateTypes.h" 
 
-#include "Styling/SlateTypes.h"
 
 void UUnitListWidget::UpdateUnitHealth(bool bIsHuman, EGameUnitType UnitType, float HPPercent)
 {
-    UE_LOG(LogTemp, Warning, TEXT("UpdateUnitHealth -> bIsHuman=%d, UnitType=%d, HPPercent=%.2f"),
-        (int32)bIsHuman, (int32)UnitType, HPPercent);
+    //UE_LOG(LogTemp, Warning, TEXT("UpdateUnitHealth -> bIsHuman=%d, UnitType=%d, HPPercent=%.2f"), (int32)bIsHuman, (int32)UnitType, HPPercent);
 
     if (bIsHuman)
     {
@@ -18,7 +17,7 @@ void UUnitListWidget::UpdateUnitHealth(bool bIsHuman, EGameUnitType UnitType, fl
                 PBHumanSniper->SetPercent(HPPercent);
             }
         }
-        else // BRAWLER
+        else 
         {
             if (PBHumanBrawler)
             {
@@ -26,7 +25,7 @@ void UUnitListWidget::UpdateUnitHealth(bool bIsHuman, EGameUnitType UnitType, fl
             }
         }
     }
-    else // AI
+    else
     {
         if (UnitType == EGameUnitType::SNIPER)
         {
@@ -35,7 +34,7 @@ void UUnitListWidget::UpdateUnitHealth(bool bIsHuman, EGameUnitType UnitType, fl
                 PBASniper->SetPercent(HPPercent);
             }
         }
-        else // BRAWLER
+        else
         {
             if (PBABrawler)
             {
@@ -45,26 +44,28 @@ void UUnitListWidget::UpdateUnitHealth(bool bIsHuman, EGameUnitType UnitType, fl
     }
 }
 
+// Sets the opponent type and updates the AI unit images accordingly.
 void UUnitListWidget::SetOpponentType(EOpponentType NewOpponent)
 {
-    UE_LOG(LogTemp, Warning, TEXT("SetOpponentType called with value: %d"), (int32)NewOpponent);
-    OpponentType = NewOpponent;
+    //UE_LOG(LogTemp, Warning, TEXT("SetOpponentType called with value: %d"), (int32)NewOpponent); OpponentType = NewOpponent;
 
-    // Esempio: se ho un AISniperImage e voglio settare la texture 
+
     if (AISniperImage)
     {
         if (OpponentType == EOpponentType::Random)
         {
-            AISniperImage->SetBrushFromTexture(RandomSniperTexture, /* bMatchSize = */ true);
-            UE_LOG(LogTemp, Warning, TEXT("RandomSniperTexture is valid!"));
+           
+            AISniperImage->SetBrushFromTexture(RandomSniperTexture, true);
+            //UE_LOG(LogTemp, Warning, TEXT("RandomSniperTexture is valid!"));
         }
-        else // EOpponentType::AStar
+        else 
         {
+            
             AISniperImage->SetBrushFromTexture(AStarSniperTexture, true);
         }
     }
 
-    // Idem per AIBrawlerImage
+  
     if (AIBrawlerImage)
     {
         if (OpponentType == EOpponentType::Random)

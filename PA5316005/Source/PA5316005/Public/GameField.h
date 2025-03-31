@@ -5,7 +5,7 @@
 #include "Templates/Function.h"
 #include "Tile.h"
 #include "GameFramework/Actor.h"
-//#include "Blueprint/UserWidget.h"
+
 #include "GameField.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnReset);
@@ -17,21 +17,18 @@ class PA5316005_API AGameField : public AActor
 	GENERATED_BODY()
 
 public:
-	// Costruttore
+	// Constructor
 	AGameField();
-
-	// Chiamato quando l’istanza della classe è piazzata in editor o spawnata a runtime
+	
 	virtual void OnConstruction(const FTransform& Transform) override;
 
-	// Chiamato all’avvio del gioco (dopo BeginPlay)
 	virtual void BeginPlay() override;
 
 	static constexpr int32 NOT_ASSIGNED = -1;
 
-	// Restituisce una tile libera casuale; se non ne esistono, ritorna nullptr.
 	ATile* GetRandomFreeTile() const;
 
-
+	// --- Properties ---
 	UPROPERTY(Transient)
 	TArray<ATile*> TileArray;
 
@@ -71,6 +68,8 @@ public:
 	UPROPERTY(EditAnywhere)
 	UUserWidget* ListOfMovesWidgetRef;
 
+
+	// --- Methods ---
 	void SetSelectedTile(FVector2D Position);
 
 	void SetLegalMoves(const TArray<FVector2D>& NewLegalMoves);
@@ -87,20 +86,16 @@ public:
 
 	TArray<FVector2D> GetLegalMoves();
 
+	// --- Methods for coordinate conversion ---
 	FVector GetRelativePositionByXYPosition(const int32 InX, const int32 InY) const;
 
 	FVector2D GetXYPositionByRelativeLocation(const FVector& Location) const;
 
+	// --- Field Generation ---
 	void GenerateField();
 
 	void GenerateLettersAndNumbers(int32 X, int32 Y);
 
-	static FString ConvertGridPosToCellString(const FVector2D& Pos)
-	{
-		char Letter = 'A' + static_cast<int>(Pos.X);
-		int32 Row = static_cast<int>(Pos.Y) + 1;
-		return FString::Printf(TEXT("%c%d"), Letter, Row);
-	}
 
 
 	template<typename T>
@@ -111,10 +106,7 @@ public:
 	void SelectTile(const FVector2D Position);
 
 	void ResetGameStatusField();
-
-
-
-
+	
 	TArray<FVector2D> PossibleMoves(FVector2D Position) const;
 
 	void ShowLegalMovesInTheField();
@@ -133,4 +125,11 @@ public:
 	void AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos);
 
 	void ShowLegalAttackOptionsForUnit(AGameUnit* Unit);
+
+	static FString ConvertGridPosToCellString(const FVector2D& Pos)
+	{
+		char Letter = 'A' + static_cast<int>(Pos.X);
+		int32 Row = static_cast<int>(Pos.Y) + 1;
+		return FString::Printf(TEXT("%c%d"), Letter, Row);
+	}
 };

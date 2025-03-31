@@ -29,74 +29,78 @@ class PA5316005_API ATile : public AActor
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this actor's properties
-	ATile();
+   
+    ATile();
 
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+   
+    virtual void BeginPlay() override;
 
-protected:
+    // --- Methods ---
 
-	// Componente di scena
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	USceneComponent* Scene;
+   
+    void SetTileStatus(const int32 TileOwner, const ETileStatus TileStatus, AGameUnit* TileGameUnit);
 
-	// Componente mesh per la visualizzazione
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* StaticMeshComponent;
+    void SetTileGameStatus(ETileGameStatus NewTileGameStatus);
 
-	// Stato attuale della tile: EMPTY, OCCUPIED oppure OBSTACLE.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
-	ETileStatus Status;
+    
+    void SetGridPosition(const double InX, const double InY);
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
-	ETileGameStatus TileGameStatus;
+   
+    void SetTileMaterial() const;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
-	bool bIsLegal;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
-	FVector2D TileGridPosition;
-
-	// Identificativo del proprietario della tile (-1 se nessuno).
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
-	int32 PlayerOwner;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
-	AGameUnit* GameUnit;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Obstacles")
-	UMaterialInterface* ObstacleMaterial1;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Obstacles")
-	UMaterialInterface* ObstacleMaterial2;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Obstacles")
-	UMaterialInterface* ObstacleMaterial3;
+    // --- Getters ---
+    ETileStatus GetTileStatus() const;
+    ETileGameStatus GetTileGameStatus() const;
+    inline bool IsLegalTile() const;
+    FVector2D GetGridPosition() const;
+    int32 GetTileOwner() const;
+    AGameUnit* GetGameUnit() const;
+    FString GameStatusToString() const;
 
 public:
+   
+    UPROPERTY(VisibleAnywhere)
+    class UTextRenderComponent* TileTextNumber;
 
-	UPROPERTY(VisibleAnywhere)
-	class UTextRenderComponent* TileTextNumber;
-	
-	UPROPERTY(VisibleAnywhere)
-	class UTextRenderComponent* TileTextLetter;
+    UPROPERTY(VisibleAnywhere)
+    class UTextRenderComponent* TileTextLetter;
 
+protected:
+    // --- Components ---
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    USceneComponent* Scene;
 
-	void SetTileStatus(const int32 TileOwner, const ETileStatus TileStatus, AGameUnit* TileGameUnit);
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    UStaticMeshComponent* StaticMeshComponent;
 
-	void SetTileGameStatus(ETileGameStatus NewTileGameStatus);
+    // --- Properties ---
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
+    ETileStatus Status;
 
-	void SetGridPosition(const double InX, const double InY);
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
+    ETileGameStatus TileGameStatus;
 
-	void SetTileMaterial() const;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
+    bool bIsLegal;
 
-	ETileStatus GetTileStatus() const;
-	ETileGameStatus GetTileGameStatus() const;
-	inline bool IsLegalTile() const;
-	FVector2D GetGridPosition() const;
-	int32 GetTileOwner() const;
-	AGameUnit* GetGameUnit() const;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
+    FVector2D TileGridPosition;
 
-	FString GameStatusToString() const;
+    
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
+    int32 PlayerOwner;
+
+   
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Game Property")
+    AGameUnit* GameUnit;
+
+    // --- Materials for Obstacle  ---
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Obstacles")
+    UMaterialInterface* ObstacleMaterial1;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Obstacles")
+    UMaterialInterface* ObstacleMaterial2;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Obstacles")
+    UMaterialInterface* ObstacleMaterial3;
 };

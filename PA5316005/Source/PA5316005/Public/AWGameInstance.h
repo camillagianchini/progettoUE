@@ -11,16 +11,14 @@ class PA5316005_API UAWGameInstance : public UGameInstance
 
 public:
 
-
-	// Messaggio da mostrare ad ogni turno (es. "Human Turn", "AI Turn")
 	UPROPERTY(EditAnywhere)
 	FString CurrentTurnMessage = "Current Player";
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game Settings")
 	int32 OpponentType = 0;
 
-	// ************ SETTERS ************
-	// Imposta il messaggio del turno
+
+	// Setters
 	UFUNCTION(BlueprintCallable)
 	void SetTurnMessage(FString Message);
 
@@ -28,7 +26,7 @@ public:
 	void SetOpponent(const int32 SelectedOpp);
 
 
-	// Ritorna il messaggio corrente del turno
+	// Getters
 	UFUNCTION(BlueprintCallable)
 	FString GetTurnMessage();
 

@@ -1,13 +1,12 @@
 #pragma once
 
-#include "AWGameMode.h"
-#include "AWGameInstance.h"
-#include "PlayerInterface.h"
-
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
 #include "Camera/CameraComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "AWGameMode.h"
+#include "AWGameInstance.h"
+#include "PlayerInterface.h"
 #include "HumanPlayer.generated.h"
 
 UCLASS()
@@ -16,47 +15,38 @@ class PA5316005_API AHumanPlayer : public APawn, public IPlayerInterface
 	GENERATED_BODY()
 
 public:
-	// Costruttore
+
 	AHumanPlayer();
 
 protected:
-	// Chiamato all’avvio del gioco o quando spawnato
-	virtual void BeginPlay() override;
-	bool IsMyTurn = false;
-	// Nella classe HumanPlayer, aggiungi una variabile membro:
 
+	virtual void BeginPlay() override;
+
+	bool IsMyTurn = false;
 
 public:
 	
-	// Chiamato ogni frame
 	virtual void Tick(float DeltaTime) override;
 
-	// Camera component attached to player pawn
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player")
 	UCameraComponent* Camera;
 
-	// Game instance reference
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player")
 	UAWGameInstance* GameInstance;
 
-	// Game Mode reference
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player")
 	AAWGameMode* GameMode;
-
-	// IPlayerInterface
+	
 	virtual void OnTurn() override;
-
 
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	// Metodo chiamato dal PlayerController (AWPlayerController) quando si clicca
 	UFUNCTION()
 	void OnClick();
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category = "Player")
 	FVector2D GetClickedTilePosition() const;
 
-	// Aggiungi la dichiarazione della funzione
 	UFUNCTION(BlueprintCallable, Category = "Player")
 	void DoNextUnitAction();
-
-
-
 };

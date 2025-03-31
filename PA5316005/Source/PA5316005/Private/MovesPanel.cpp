@@ -11,11 +11,11 @@ void UMovesPanel::AddMoveToPanel(const FGameMove& Move)
 {
     if (!ScrollBox || !MoveHistoryWidgetClass)
     {
-        UE_LOG(LogTemp, Warning, TEXT("MovesPanel: ScrollBox o MoveWidgetEntryClass non assegnati!"));
+        //UE_LOG(LogTemp, Warning, TEXT("MovesPanel: ScrollBox o MoveWidgetEntryClass non assegnati!"));
         return;
     }
 
-    // Siccome "this" è un UUserWidget, spesso si fa CreateWidget<>(GetWorld(), ...)
+
     UMoveHistoryWidget* MoveEntry = CreateWidget<UMoveHistoryWidget>(GetWorld(), MoveHistoryWidgetClass);
     if (MoveEntry)
     {
@@ -29,7 +29,6 @@ void UMovesPanel::PopMoveFromPanel()
 {
 	if (ScrollBox && ScrollBox->GetChildrenCount() > 0)
 	{
-		// Rimuovi l'ultimo widget
 		UWidget* LastChild = ScrollBox->GetChildAt(ScrollBox->GetChildrenCount() - 1);
 		if (LastChild)
 		{

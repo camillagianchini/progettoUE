@@ -18,10 +18,7 @@ AGameField::AGameField()
 	NormalizedCellPadding = 1;
 	GameUnitScalePercentage = 100;
 	ListOfMovesWidgetRef = nullptr;
-
 }
-
-
 
 void AGameField::OnConstruction(const FTransform& Transform)
 {
@@ -37,11 +34,9 @@ void AGameField::BeginPlay()
 	if (TileArray.Num() == 0)
 	{
 		GenerateField();
-		// Chiama la generazione degli ostacoli, ad esempio con il 15% di ostacoli
 		GenerateObstacles(0.15f);
 	}
 }
-
 
 void AGameField::SetSelectedTile(FVector2D Position)
 {
@@ -85,17 +80,13 @@ FVector AGameField::GetRelativePositionByXYPosition(const int32 InX, const int32
 
 FVector2D AGameField::GetXYPositionByRelativeLocation(const FVector& Location) const
 {
-	// Calcola la posizione relativa rispetto all'origine del GameField
 	FVector RelativeLocation = Location - GetActorLocation();
 
-	// Dividi per la dimensione del tile per ottenere la griglia
 	double x = RelativeLocation.X / (TileSize * NormalizedCellPadding);
 	double y = RelativeLocation.Y / (TileSize * NormalizedCellPadding);
 
 	return FVector2D(FMath::RoundToFloat(x), FMath::RoundToFloat(y));
 }
-
-
 
 void AGameField::GenerateField()
 {
@@ -119,22 +110,17 @@ void AGameField::GenerateField()
 
 void AGameField::GenerateLettersAndNumbers(int32 X, int32 Y)
 {
-	// Verifica che la tile esista nella mappa o nell’array
 	if (TileMap.Contains(FVector2D(X, Y)))
 	{
 		ATile* TheTile = TileMap[FVector2D(X, Y)];
 		if (TheTile)
 		{
-			// Calcolo della lettera (es. A=0, B=1, ecc.)
-			// ATTENZIONE: se X può superare 25, servirà una logica diversa (doppia lettera, ecc.)
 			char LetterChar = 'A' + X;
 			FString LetterString = FString::Printf(TEXT("%c"), LetterChar);
 
-			// Calcolo del numero (es. 1=0, 2=1, ecc.)
 			int32 NumberValue = Y + 1;
 			FString NumberString = FString::FromInt(NumberValue);
 
-			// Se i componenti di testo esistono, settiamo le scritte
 			if (TheTile->TileTextLetter)
 			{
 				TheTile->TileTextLetter->SetText(FText::FromString(LetterString));
@@ -145,9 +131,7 @@ void AGameField::GenerateLettersAndNumbers(int32 X, int32 Y)
 				TheTile->TileTextNumber->SetText(FText::FromString(NumberString));
 			}
 
-			// Facoltativo: log per debug
-			UE_LOG(LogTemp, Log, TEXT("Tile (%d, %d): Letter = %s, Number = %s"),
-				X, Y, *LetterString, *NumberString);
+			//UE_LOG(LogTemp, Log, TEXT("Tile (%d, %d): Letter = %s, Number = %s"),X, Y, *LetterString, *NumberString);
 		}
 	}
 }
@@ -155,67 +139,50 @@ void AGameField::GenerateLettersAndNumbers(int32 X, int32 Y)
 template<typename T>
 void AGameField::GenerateGameUnit(FVector2D Position, int32 Player)
 {
-	// Verifica che esista una tile nella posizione specificata
 	if (!TileMap.Contains(Position))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Nessuna tile trovata in posizione %s!"), *Position.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("No tile found at position %s!"), *Position.ToString());
 		return;
 	}
 
 	ATile* LocalSelectedTile = TileMap[Position];
-	// Controlla se la tile è vuota
 	if (!LocalSelectedTile || LocalSelectedTile->GetTileStatus() != ETileStatus::EMPTY)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("La tile in posizione %s non è vuota!"), *Position.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("Tile at position %s is not empty!"), *Position.ToString());
 		return;
 	}
 
-	// Ottieni il riferimento al mondo
 	UWorld* World = GetWorld();
 	if (!World)
 	{
-		UE_LOG(LogTemp, Error, TEXT("World non trovato!"));
+		//UE_LOG(LogTemp, Error, TEXT("World not found!"));
 		return;
 	}
 
-	// Converti la posizione della griglia in coordinate del mondo
 	FVector SpawnLocation = GetRelativePositionByXYPosition(Position.X, Position.Y);
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = this;
 
-	// Spawn dell'unità del tipo specificato
 	T* NewUnit = World->SpawnActor<T>(T::StaticClass(), SpawnLocation, FRotator::ZeroRotator, SpawnParams);
 	if (NewUnit)
 	{
 		NewUnit->SetPlayerOwner(Player);
-		// Aggiorna la posizione della griglia per la nuova unità:
 		NewUnit->SetGridPosition(Position.X, Position.Y);
-		UE_LOG(LogTemp, Warning, TEXT("Unità ID=%d posizionata in (%f, %f)"),
-			NewUnit->GetGameUnitID(), NewUnit->GetGridPosition().X, NewUnit->GetGridPosition().Y);
+		//UE_LOG(LogTemp, Warning, TEXT("Unit ID=%d spawned at (%f, %f)"),NewUnit->GetGameUnitID(), NewUnit->GetGridPosition().X, NewUnit->GetGridPosition().Y);
 
-		// Aggiorna lo stato della tile: ora è occupata dall'unità appena spawnata
 		LocalSelectedTile->SetTileStatus(Player, ETileStatus::OCCUPIED, NewUnit);
 
-		// Aggiungi l'unità nella mappa delle unità
 		int32 NewUnitKey = GameUnitMap.Num();
 		GameUnitMap.Add(NewUnitKey, NewUnit);
 
-		UE_LOG(LogTemp, Log, TEXT("Unità di tipo %s spawnata in %s per il player %d"),
-			*T::StaticClass()->GetName(), *Position.ToString(), Player);
+		//UE_LOG(LogTemp, Log, TEXT("Unit of type %s spawned at %s for player %d"),*T::StaticClass()->GetName(), *Position.ToString(), Player);
 	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Spawn dell'unità di tipo %s fallito in posizione %s"),
-			*T::StaticClass()->GetName(), *Position.ToString());
-	}
+
 }
 
 
-
-
-
-
+// Explicit template instantiations
 template void AGameField::GenerateGameUnit<ASniper>(FVector2D Position, int32 Player);
 template void AGameField::GenerateGameUnit<ABrawler>(FVector2D Position, int32 Player);
 
@@ -251,22 +218,17 @@ TArray<FVector2D> AGameField::PossibleMoves(FVector2D Position) const
 {
 	TArray<FVector2D> Moves;
 
-	// Cerca la tile nella mappa
 	if (TileMap.Contains(Position))
 	{
 		ATile* Tile = TileMap[Position];
 		if (Tile && Tile->GetGameUnit())
 		{
-			// Supponiamo che la GameUnit abbia un metodo CalculateLegalMoves()
 			Moves = Tile->GetGameUnit()->CalculateLegalMoves();
 		}
 	}
 
 	return Moves;
 }
-
-
-
 
 
 void AGameField::ShowLegalMovesInTheField()
@@ -290,10 +252,8 @@ void AGameField::ShowLegalMovesInTheField()
 	}
 }
 
-// Funzione per controllare se tutte le celle libere sono raggiungibili
 bool AGameField::IsGridConnected() const
 {
-	// Trova una cella libera di partenza
 	FVector2D StartPos(-1, -1);
 	for (ATile* Tile : TileArray)
 	{
@@ -305,11 +265,10 @@ bool AGameField::IsGridConnected() const
 	}
 	if (StartPos.X < 0)
 	{
-		// Se non troviamo celle libere, consideriamo la griglia connessa
 		return true;
 	}
 
-	// BFS per esplorare le celle libere
+	// BFS
 	TSet<FVector2D> Visited;
 	TQueue<FVector2D> Queue;
 	Queue.Enqueue(StartPos);
@@ -339,8 +298,6 @@ bool AGameField::IsGridConnected() const
 			}
 		}
 	}
-
-	// Conta quante celle libere ci sono nella griglia
 	int32 TotalFreeCells = 0;
 	for (ATile* Tile : TileArray)
 	{
@@ -353,14 +310,13 @@ bool AGameField::IsGridConnected() const
 	return Visited.Num() == TotalFreeCells;
 }
 
-// Modifica della funzione di generazione degli ostacoli
 void AGameField::GenerateObstacles(float ObstaclePercentage)
 {
 	int32 TotalCells = Size * Size;
 	int32 ObstaclesToPlace = FMath::RoundToInt(TotalCells * ObstaclePercentage);
 	int32 Placed = 0;
 	int32 Attempts = 0;
-	int32 MaxAttempts = ObstaclesToPlace * 10; // Per evitare loop infiniti
+	int32 MaxAttempts = ObstaclesToPlace * 10;
 
 	while (Placed < ObstaclesToPlace && Attempts < MaxAttempts)
 	{
@@ -369,14 +325,11 @@ void AGameField::GenerateObstacles(float ObstaclePercentage)
 		ATile* RandTile = TileArray[RandIndex];
 		if (RandTile && RandTile->GetTileStatus() == ETileStatus::EMPTY)
 		{
-			// Segna temporaneamente la tile come ostacolo
 			RandTile->SetTileStatus(-1, ETileStatus::OBSTACLE, nullptr);
 			RandTile->SetTileMaterial();
 
-			// Verifica la connettività della griglia
 			if (!IsGridConnected())
 			{
-				// Se la griglia non è connessa, ripristina lo stato EMPTY
 				RandTile->SetTileStatus(AGameField::NOT_ASSIGNED, ETileStatus::EMPTY, nullptr);
 				RandTile->SetTileMaterial();
 			}
@@ -389,7 +342,7 @@ void AGameField::GenerateObstacles(float ObstaclePercentage)
 
 	if (Attempts >= MaxAttempts)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("GenerateObstacles: tentativi massimi raggiunti, ostacoli posizionati: %d"), Placed);
+		//UE_LOG(LogTemp, Warning, TEXT("GenerateObstacles: maximum attempts reached, obstacles placed: %d"), Placed);
 	}
 }
 
@@ -397,25 +350,20 @@ void AGameField::GenerateObstacles(float ObstaclePercentage)
 
 void AGameField::ResetField()
 {
-		// Resetta la tile selezionata e l'array dei movimenti legali
 		SelectedTile = FVector2D::ZeroVector;
 		LegalMovesArray.Empty();
 
-		// Itera su tutte le tile per resettare il loro stato di gioco
 		for (ATile* Tile : TileArray)
 		{
 			if (Tile)
 			{
-				// Imposta lo stato della tile come FREE per il gioco e EMPTY per la presenza di unità
 				Tile->SetTileGameStatus(ETileGameStatus::FREE);
 				Tile->SetTileStatus(NOT_ASSIGNED, ETileStatus::EMPTY, nullptr);
 
-				// Aggiorna il materiale per riflettere il reset (es. colore di default)
 				Tile->SetTileMaterial();
 			}
 		}
 
-		// Distruggi tutte le unità spawnate e svuota la mappa delle unità
 		for (auto& Pair : GameUnitMap)
 		{
 			if (Pair.Value)
@@ -425,10 +373,8 @@ void AGameField::ResetField()
 		}
 		GameUnitMap.Empty();
 
-		// Eventuale log di debug
-		UE_LOG(LogTemp, Log, TEXT("GameField reset: tutte le tile sono state ripristinate e le unità eliminate."));
+		UE_LOG(LogTemp, Log, TEXT("GameField reset: all tiles reset and units eliminated."));
 
-		// Notifica ai blueprint (o ad altri sistemi) che il campo è stato resettato
 		OnResetEvent.Broadcast();
 }
 
@@ -452,65 +398,49 @@ ATile* AGameField::GetRandomFreeTile() const
 	return nullptr;
 }
 
-
-
-
 void AGameField::MoveUnit(AGameUnit* Unit, const FVector2D& NewPos, TFunction<void()> OnMovementFinished)
 {
 	if (!Unit)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("MoveUnit: Unità nulla!"));
+		//UE_LOG(LogTemp, Warning, TEXT("MoveUnit: Unit is null!"));
 		return;
 	}
 
-	// Calcola il percorso da seguire
 	FVector2D StartPos = Unit->GetGridPosition();
 	TArray<FVector2D> FoundPath = Unit->CalculatePath(NewPos);
 
 	if (FoundPath.Num() == 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("MoveUnit: Nessun percorso trovato da %s a %s."), *StartPos.ToString(), *NewPos.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("MoveUnit: No path found from %s to %s."), *StartPos.ToString(), *NewPos.ToString());
 		return;
 	}
 
-	// Libera la tile di partenza
 	if (TileMap.Contains(StartPos))
 	{
 		ATile* OldTile = TileMap[StartPos];
 		OldTile->SetTileStatus(AGameField::NOT_ASSIGNED, ETileStatus::EMPTY, nullptr);
 	}
 
-	// Copia il percorso in uno smart pointer per mantenerlo valido nella lambda
 	TSharedPtr<TArray<FVector2D>> PathPtr = MakeShared<TArray<FVector2D>>(FoundPath);
 
-	// Usa dei TSharedPtr per l'indice corrente e il TimerHandle
 	TSharedPtr<int32> CurrentStepPtr = MakeShared<int32>(0);
 	TSharedPtr<FTimerHandle> TimerHandlePtr = MakeShared<FTimerHandle>();
-
-	
-
-	// ...
 	FTimerDelegate TimerDelegate;
 	TimerDelegate.BindLambda([this, Unit, PathPtr, StartPos, NewPos, CurrentStepPtr, TimerHandlePtr, OnMovementFinished]() mutable
 		{
-			// Se l'unità è stata distrutta, ferma il timer
 			if (!Unit || !Unit->IsValidLowLevel())
 			{
 				GetWorld()->GetTimerManager().ClearTimer(*TimerHandlePtr);
 				return;
 			}
 
-			// Se ci sono ancora passi da compiere nel percorso
 			if (*CurrentStepPtr < PathPtr->Num())
 			{
-				// Ottieni la prossima cella del percorso
 				FVector2D CellPos = (*PathPtr)[*CurrentStepPtr];
 				FVector StepPos = GetRelativePositionByXYPosition(CellPos.X, CellPos.Y);
 
-				// Aggiorna la posizione dell'unità (mantenendo l'altezza attuale)
 				Unit->SetActorLocation(FVector(StepPos.X, StepPos.Y, Unit->GetActorLocation().Z));
 
-				// Se siamo all'ultimo passo, aggiorna la tile di destinazione e la posizione in griglia
 				if (*CurrentStepPtr == PathPtr->Num() - 1)
 				{
 					if (TileMap.Contains(NewPos))
@@ -527,108 +457,86 @@ void AGameField::MoveUnit(AGameUnit* Unit, const FVector2D& NewPos, TFunction<vo
 					NewMove.bIsAttack = false;
 					
 					AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
-					// Aggiungi la mossa allo storico se il MovesPanel esiste
 					if (GM && GM->MovesPanel)
 					{
 						GM->MovesPanel->AddMoveToPanel(NewMove);
 					}
-					// Movimento completato: chiama il callback se esiste
 					if (OnMovementFinished)
 					{
 						OnMovementFinished();
 					}
 					
 				}
-
-				// Incrementa l'indice per il prossimo step
 				(*CurrentStepPtr)++;
 			}
 			else
 			{
-				// Percorso completato: ferma il timer
 				GetWorld()->GetTimerManager().ClearTimer(*TimerHandlePtr);
 			}
 		});
 
-	// Avvia il timer: la lambda verrà eseguita ogni 0.1 secondi finché non viene fermata
 	GetWorld()->GetTimerManager().SetTimer(*TimerHandlePtr, TimerDelegate, 0.1f, true);
 }
-
-
-
-
-
-
 
 void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 {
 	if (!Attacker)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AttackUnit: Attacker is null"));
+		//UE_LOG(LogTemp, Warning, TEXT("AttackUnit: Attacker is null"));
 		return;
 	}
 
 	if (!TileMap.Contains(TargetPos))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AttackUnit: TargetPos %s is not valid"), *TargetPos.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("AttackUnit: TargetPos %s is not valid"), *TargetPos.ToString());
 		return;
 	}
 
 	ATile* TargetTile = TileMap[TargetPos];
 	if (!TargetTile || TargetTile->GetTileStatus() != ETileStatus::OCCUPIED)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AttackUnit: No unit to attack at %s"), *TargetPos.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("AttackUnit: No unit to attack at %s"), *TargetPos.ToString());
 		return;
 	}
 
 	AGameUnit* Defender = TargetTile->GetGameUnit();
 	if (!Defender)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AttackUnit: Defender is null"));
+		//UE_LOG(LogTemp, Warning, TEXT("AttackUnit: Defender is null"));
 		return;
 	}
 
-	// Verifica se TargetPos è effettivamente attaccabile dall'Attacker
 	TArray<FVector2D> PossibleAttacks = Attacker->CalculateAttackMoves();
 	if (!PossibleAttacks.Contains(TargetPos))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AttackUnit: Target cell %s is not in attack range"), *TargetPos.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("AttackUnit: Target cell %s is not in attack range"), *TargetPos.ToString());
 		return;
 	}
 
-	// Calcola il danno casuale tra DamageMin e DamageMax dell'unità attaccante
+
 	int32 Damage = FMath::RandRange(Attacker->GetDamageMin(), Attacker->GetDamageMax());
-	UE_LOG(LogTemp, Log, TEXT("AttackUnit: Unit %d attacks unit %d for %d damage"),
-		Attacker->GetGameUnitID(), Defender->GetGameUnitID(), Damage);
+	//UE_LOG(LogTemp, Log, TEXT("AttackUnit: Unit %d attacks unit %d for %d damage"), Attacker->GetGameUnitID(), Defender->GetGameUnitID(), Damage);
 
 	FGameMove AttackMove;
 	AttackMove.PlayerID = (Attacker->GetPlayerOwner() == 0) ? TEXT("HP") : TEXT("AI");
 	AttackMove.UnitType = (Attacker->GetGameUnitType() == EGameUnitType::SNIPER) ? TEXT("S") : TEXT("B");
-	// Converti la posizione in una notazione a tua scelta (ad esempio "A1")
-	// Puoi implementare una funzione di utilità come ConvertToCellNotation(TargetPos)
 	AttackMove.TargetCell = ConvertGridPosToCellString(TargetPos);
 	AttackMove.Damage = Damage;
 	AttackMove.bIsAttack = true;
-
-
+	
 	AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
-	// Aggiungi la mossa allo storico se il MovesPanel esiste
 	if (GM && GM->MovesPanel)
 	{
 		GM->MovesPanel->AddMoveToPanel(AttackMove);
 	}
 
-	// Sottrai i punti vita del difensore e aggiorna il widget (tramite TakeDamageUnit)
 	Defender->TakeDamageUnit(Damage);
 
-	// Se il difensore muore, rimuovilo dalla griglia e distruggilo
 	if (Defender->IsDead())
 	{
-		UE_LOG(LogTemp, Log, TEXT("AttackUnit: Unit %d is destroyed"), Defender->GetGameUnitID());
-		// Libera la tile
+		//UE_LOG(LogTemp, Log, TEXT("AttackUnit: Unit %d is destroyed"), Defender->GetGameUnitID());
 		TargetTile->SetTileStatus(AGameField::NOT_ASSIGNED, ETileStatus::EMPTY, nullptr);
 
-		// Rimuovi il difensore dalla mappa delle unità
 		for (auto It = GameUnitMap.CreateIterator(); It; ++It)
 		{
 			if (It.Value() == Defender)
@@ -639,7 +547,6 @@ void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 		}
 		Defender->Destroy();
 
-		// Controlla se il giocatore proprietario del difensore ha ancora unità nella mappa
 		bool bUnitsLeft = false;
 		for (auto& UnitPair : GameUnitMap)
 		{
@@ -655,14 +562,11 @@ void AGameField::AttackUnit(AGameUnit* Attacker, const FVector2D& TargetPos)
 			
 			if (GM)
 			{
-				GM->EndGame();  // EndGame() gestirà il messaggio "Human wins!" o "AI wins!" a seconda di chi ha perso
+				GM->EndGame();
 			}
 		}
 	}
 
-
-
-	// Se l’attaccante è uno Sniper, gestisci il contrattacco (se le condizioni sono verificate)
 	if (Attacker->GetGameUnitType() == EGameUnitType::SNIPER)
 	{
 		ASniper* Sniper = Cast<ASniper>(Attacker);
@@ -678,23 +582,19 @@ void AGameField::ShowLegalMovesForUnit(AGameUnit* Unit)
 {
 	if (Unit->IsDead())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ShowLegalMovesForUnit: Unit morta!"));
+		//UE_LOG(LogTemp, Warning, TEXT("ShowLegalMovesForUnit: Unit is dead!"));
 		return;
 	}
-
-
-
+	
 	AAWGameMode* GM = Cast<AAWGameMode>(GetWorld()->GetAuthGameMode());
 	if (!GM || !GM->GField)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ShowLegalMovesForUnit: GameMode o GameField non trovato."));
+		//UE_LOG(LogTemp, Warning, TEXT("ShowLegalMovesForUnit: GameMode or GameField not found."));
 		return;
 	}
 
-	// Resetta lo stato di evidenziazione di tutte le tile
 	ResetGameStatusField();
 
-	// Se l'unità non ha ancora mosso, evidenzia le celle di movimento
 	if (!Unit->bHasMoved)
 	{
 		TArray<FVector2D> LegalMoves = Unit->CalculateLegalMoves();
@@ -710,7 +610,7 @@ void AGameField::ShowLegalMovesForUnit(AGameUnit* Unit)
 				}
 			}
 		}
-		UE_LOG(LogTemp, Warning, TEXT("Numero di mosse legali trovate: %d"), ValidMoves.Num());
+		//UE_LOG(LogTemp, Warning, TEXT("Number of legal moves found: %d"), ValidMoves.Num());
 		for (const FVector2D& MovePos : ValidMoves)
 		{
 			if (IsValidPosition(MovePos))
@@ -728,7 +628,6 @@ void AGameField::ShowLegalMovesForUnit(AGameUnit* Unit)
 
 void AGameField::ShowLegalAttackOptionsForUnit(AGameUnit* Unit)
 {
-	// Non è necessario resettare qui se ShowLegalMovesForUnit l'ha già fatto
 	TArray<FVector2D> AttackMoves = Unit->CalculateAttackMoves();
 	TArray<FVector2D> ValidAttacks;
 	for (const FVector2D& AttackPos : AttackMoves)
@@ -736,7 +635,6 @@ void AGameField::ShowLegalAttackOptionsForUnit(AGameUnit* Unit)
 		if (IsValidPosition(AttackPos))
 		{
 			ATile* Tile = TileMap[AttackPos];
-			// Considera valida la mossa di attacco se la tile è occupata da un nemico
 			if (Tile && Tile->GetTileStatus() == ETileStatus::OCCUPIED)
 			{
 				AGameUnit* Target = Tile->GetGameUnit();
@@ -747,7 +645,7 @@ void AGameField::ShowLegalAttackOptionsForUnit(AGameUnit* Unit)
 			}
 		}
 	}
-	UE_LOG(LogTemp, Warning, TEXT("Numero di attacchi validi trovati: %d"), ValidAttacks.Num());
+	//UE_LOG(LogTemp, Warning, TEXT("Number of valid attacks found: %d"), ValidAttacks.Num());
 	for (const FVector2D& AttackPos : ValidAttacks)
 	{
 		if (IsValidPosition(AttackPos))

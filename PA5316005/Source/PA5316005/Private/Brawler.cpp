@@ -6,8 +6,6 @@
 
 ABrawler::ABrawler()
 {
-	// Imposta i parametri predefiniti per il Brawler secondo le specifiche:
-	// Movimento: max 6 celle, Range attacco: 1, Danno: 1–6, Vita: 40
 	SetGameUnitType(EGameUnitType::BRAWLER);
 	SetMovementRange(6);
 	SetAttackRange(1);
@@ -21,18 +19,15 @@ void ABrawler::BeginPlay()
 
 
 	SetGameUnitID();
-	UE_LOG(LogTemp, Warning, TEXT("ABrawler::BeginPlay - Type=%d, ID=%d"),
-		(int32)GetGameUnitType(), GetGameUnitID());
+	//UE_LOG(LogTemp, Warning, TEXT("ABrawler::BeginPlay - Type=%d, ID=%d"), (int32)GetGameUnitType(), GetGameUnitID());
 }
 
-// In ABrawler.cpp
 TArray<FVector2D> ABrawler::CalculateAttackMoves() const
 {
     TArray<FVector2D> AttackableCells;
     AGameField* GF = GameMode->GField;
     FVector2D MyPos = GetGridPosition();
 
-    // Solo 4 direzioni ortogonali (su, giù, sinistra, destra)
     const TArray<FVector2D> Directions = {
         FVector2D(1, 0),
         FVector2D(-1, 0),
