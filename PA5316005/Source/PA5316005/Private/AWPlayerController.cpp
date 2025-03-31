@@ -19,11 +19,6 @@ void AAWPlayerController::BeginPlay()
 {
     Super::BeginPlay();
 
-    FInputModeGameAndUI InputMode;
-    InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-
-    SetInputMode(InputMode);
-
     if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
     {
         Subsystem->AddMappingContext(AWContext, 0);
